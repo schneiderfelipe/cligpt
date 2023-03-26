@@ -2,6 +2,8 @@
 name = "cligpt"
 version = "0.1.0"
 edition = "2021"
+authors = ["Felipe S. S. Schneider <schneider.felipe.5@gmail.com>"]
+description = "A command-line interface for ChatGPT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
