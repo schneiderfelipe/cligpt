@@ -12,7 +12,7 @@
 //! ## Requirements
 //!
 //! Before installing `cligpt`,
-//! you need to make sure you have [Rust](https://www.rust-lang.org/tools/install) (version 1.64.0 or later) installed.
+//! you need to make sure you have [Rust](https://www.rust-lang.org/tools/install) (version 1.65.0 or later) installed.
 //!
 //! ## Instructions
 //!
