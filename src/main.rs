@@ -3,7 +3,7 @@
 use clap::Parser;
 
 /// A command-line interface for ChatGPT.
-#[derive(Parser)]
+#[derive(Debug, Parser)]
 #[command(version, author, about)]
 struct Cli {
     /// Your OpenAI API key.
@@ -17,5 +17,5 @@ struct Cli {
 fn main() {
     let cli = Cli::parse();
 
-    println!("Hello, world!");
+    println!("{cli:#?}");
 }
