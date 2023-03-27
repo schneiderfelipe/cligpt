@@ -1,15 +1,15 @@
-//! A command-line interface for ChatGPT.
+//! A command-line interface for `ChatGPT`.
 
 use std::error::Error;
 
 use async_openai::{
-    types::{ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs, Role},
+    types::{ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs},
     Client,
 };
 use clap::Parser;
 use futures_util::StreamExt;
 
-/// A command-line interface for ChatGPT.
+/// A command-line interface for `ChatGPT`.
 #[derive(Debug, Parser)]
 #[command(version, author, about)]
 struct Cli {
@@ -43,11 +43,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Ok(response) => {
                 if let Some(choice) = response.choices.get(0) {
                     if let Some(text) = &choice.delta.content {
-                        print!("{}", text);
+                        print!("{text}");
                     }
                 }
             }
-            Err(error) => eprintln!("error: {}", error),
+            Err(error) => eprintln!("error: {error}"),
         }
     }
     println!();
