@@ -75,6 +75,7 @@
 
 use std::io::{self, Read};
 
+use anyhow::Context;
 use async_openai::{
     types::{ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs},
     Client,
@@ -99,7 +100,10 @@ async fn main() -> Result<(), anyhow::Error> {
     let cli = Cli::parse();
 
     let mut message = String::new();
-    io::stdin().lock().read_to_string(&mut message)?;
+    io::stdin()
+        .lock()
+        .read_to_string(&mut message)
+        .context("failed to read from the standard input")?;
     let context = cli.context.join(" ");
     let message = format!("{context} {message}");
 
@@ -112,12 +116,18 @@ async fn main() -> Result<(), anyhow::Error> {
         .temperature(0.7)
         .messages([ChatCompletionRequestMessageArgs::default()
             .content(message)
-            .build()?])
-        .build()?;
-    let mut stream = client.chat().create_stream(request).await?;
+            .build()
+            .context("failed to build a message")?])
+        .build()
+        .context("failed to build the completion request")?;
+    let mut stream = client
+        .chat()
+        .create_stream(request)
+        .await
+        .context("failed to create the completion stream")?;
 
     while let Some(result) = stream.next().await {
-        let response = result?;
+        let response = result.context("failed to obtain a stream response")?;
         if let Some(choice) = response.choices.get(0) {
             if let Some(text) = &choice.delta.content {
                 print!("{text}");
