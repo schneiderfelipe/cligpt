@@ -19,7 +19,7 @@ you need to make sure you have [Rust](https://www.rust-lang.org/tools/install) (
 ### Instructions
 
 Once you have Rust installed,
-you can clone this repository and build it manually from source using [Cargo](https://doc.rust-lang.org/cargo/):
+you can clone this repository and build it using [Cargo](https://doc.rust-lang.org/cargo/):
 
 ```bash
 git clone https://github.com/schneiderfelipe/cligpt.git
@@ -27,7 +27,9 @@ cd cligpt
 cargo install --path=.
 ```
 
-This will download the necessary dependencies and compile the `cligpt` binary.
+This will download the necessary dependencies,
+compile the `cligpt` binary,
+and install it in your system.
 Once the installation is complete,
 you can run `cligpt` by typing `cligpt` in your terminal.
 
@@ -44,5 +46,4 @@ Here's an example usage:
 cligpt --api-key YOUR_API_KEY "Hello, ChatGPT!"
 ```
 
-This will send the message "Hello, ChatGPT!" to the ChatGPT API using your API key,
-and print the generated text to your terminal.
+This will send the message "Hello, ChatGPT!" to the ChatGPT API using your API key and print the generated text to your terminal.
