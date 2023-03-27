@@ -73,10 +73,7 @@
 //!
 //! This will send the message `'Hello, ChatGPT!'` to the `ChatGPT` API using your API key and print the generated text to your terminal.
 
-use std::{
-    error::Error,
-    io::{self, Read},
-};
+use std::io::{self, Read};
 
 use async_openai::{
     types::{ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs},
@@ -98,7 +95,7 @@ struct Cli {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result<(), anyhow::Error> {
     let cli = Cli::parse();
 
     let mut message = String::new();
