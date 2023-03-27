@@ -17,7 +17,7 @@
 //! the package manager for Rust,
 //! installed.
 //!
-//! ## From [crates.io](https://crates.io/) (recommended)
+//! ## From [crates.io](https://crates.io/crates/cligpt) (recommended)
 //!
 //! Once you have Rust and Cargo installed,
 //! you can install `cligpt` from [crates.io](https://crates.io/) using Cargo:
