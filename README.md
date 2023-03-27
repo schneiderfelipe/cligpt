@@ -43,7 +43,7 @@ or by setting the `OPENAI_API_KEY` environment variable.
 Here's an example usage:
 
 ```bash
-cligpt --api-key YOUR_API_KEY "Hello, ChatGPT!"
+cligpt --api-key YOUR_API_KEY 'Hello, ChatGPT!'
 ```
 
 This will send the message "Hello, ChatGPT!" to the ChatGPT API using your API key and print the generated text to your terminal.

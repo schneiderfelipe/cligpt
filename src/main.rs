@@ -43,13 +43,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Ok(response) => {
                 if let Some(choice) = response.choices.get(0) {
                     if let Some(text) = &choice.delta.content {
-                        println!("{}", text);
+                        print!("{}", text);
                     }
                 }
             }
             Err(error) => eprintln!("error: {}", error),
         }
     }
+    println!();
 
     Ok(())
 }
