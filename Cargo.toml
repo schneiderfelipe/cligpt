@@ -13,6 +13,7 @@ license = "MIT"
 [dependencies]
 async-openai = { version = "0.10.1" }
 clap = { version = "4.1.13", features = ["derive", "env"] }
+color-eyre = "0.6.2"
 futures-util = { version = "0.3.27", default-features = false }
 tokio = { version = "1.26.0", features = [
   "rt-multi-thread",

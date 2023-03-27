@@ -73,16 +73,14 @@
 //!
 //! This will send the message `'Hello, ChatGPT!'` to the `ChatGPT` API using your API key and print the generated text to your terminal.
 
-use std::{
-    error::Error,
-    io::{self, Read},
-};
+use std::io::{self, Read};
 
 use async_openai::{
     types::{ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs},
     Client,
 };
 use clap::Parser;
+use color_eyre::eyre::Context;
 use futures_util::StreamExt;
 
 /// A command-line interface to talk to `ChatGPT`.
@@ -98,11 +96,16 @@ struct Cli {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result<(), color_eyre::eyre::Error> {
+    color_eyre::install().context("failed to install error report handler")?;
+
     let cli = Cli::parse();
 
     let mut message = String::new();
-    io::stdin().lock().read_to_string(&mut message)?;
+    io::stdin()
+        .lock()
+        .read_to_string(&mut message)
+        .context("failed to read from the standard input")?;
     let context = cli.context.join(" ");
     let message = format!("{context} {message}");
 
@@ -115,20 +118,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .temperature(0.7)
         .messages([ChatCompletionRequestMessageArgs::default()
             .content(message)
-            .build()?])
-        .build()?;
-    let mut stream = client.chat().create_stream(request).await?;
+            .build()
+            .context("failed to build a message")?])
+        .build()
+        .context("failed to build the completion request")?;
+    let mut stream = client
+        .chat()
+        .create_stream(request)
+        .await
+        .context("failed to create the completion stream")?;
 
     while let Some(result) = stream.next().await {
-        match result {
-            Ok(response) => {
-                if let Some(choice) = response.choices.get(0) {
-                    if let Some(text) = &choice.delta.content {
-                        print!("{text}");
-                    }
-                }
+        let response = result.context("failed to obtain a stream response")?;
+        if let Some(choice) = response.choices.get(0) {
+            if let Some(text) = &choice.delta.content {
+                print!("{text}");
             }
-            Err(error) => eprintln!("error: {error}"),
         }
     }
     println!();
