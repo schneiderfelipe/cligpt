@@ -10,11 +10,7 @@ rust-version = "1.65.0"
 
 [dependencies]
 async-openai = { version = "0.10.1", default-features = false }
-clap = { version = "4.1.13", features = [
-  "derive",
-  "env",
-  "std",
-], default-features = false }
+clap = { version = "4.1.13", features = ["derive", "env"] }
 futures-util = { version = "0.3.27", default-features = false }
 tokio = { version = "1.26.0", features = [
   "rt-multi-thread",
