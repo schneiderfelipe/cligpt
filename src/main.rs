@@ -120,15 +120,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut stream = client.chat().create_stream(request).await?;
 
     while let Some(result) = stream.next().await {
-        match result {
-            Ok(response) => {
-                if let Some(choice) = response.choices.get(0) {
-                    if let Some(text) = &choice.delta.content {
-                        print!("{text}");
-                    }
-                }
+        let response = result?;
+        if let Some(choice) = response.choices.get(0) {
+            if let Some(text) = &choice.delta.content {
+                print!("{text}");
             }
-            Err(error) => eprintln!("error: {error}"),
         }
     }
     println!();
