@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Felipe S. S. Schneider <schneider.felipe.5@gmail.com>"]
 edition = "2021"
 rust-version = "1.65.0"
-description = "A command-line interface for ChatGPT"
+description = "A command-line interface to talk to ChatGPT"
 repository = "https://github.com/schneiderfelipe/cligpt"
 license = "MIT"
 
