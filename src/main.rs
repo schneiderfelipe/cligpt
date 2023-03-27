@@ -7,7 +7,7 @@ use clap::Parser;
 #[command(version, author, about)]
 struct Cli {
     /// Your OpenAI API key.
-    #[arg(short = 'k', long)]
+    #[arg(short = 'k', long, env = "OPENAI_API_KEY")]
     api_key: String,
 }
 
