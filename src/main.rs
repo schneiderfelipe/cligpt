@@ -75,12 +75,12 @@
 
 use std::io::{self, Read};
 
-use anyhow::Context;
 use async_openai::{
     types::{ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs},
     Client,
 };
 use clap::Parser;
+use eyre::Context;
 use futures_util::StreamExt;
 
 /// A command-line interface to talk to `ChatGPT`.
@@ -96,7 +96,7 @@ struct Cli {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), anyhow::Error> {
+async fn main() -> Result<(), eyre::Error> {
     let cli = Cli::parse();
 
     let mut message = String::new();
