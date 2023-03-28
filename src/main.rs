@@ -90,10 +90,6 @@ use futures_util::StreamExt;
 #[derive(Debug, Parser)]
 #[command(version, author, about)]
 struct Cli {
-    /// Your OpenAI API key.
-    #[arg(short = 'k', long, env = "OPENAI_API_KEY", value_parser = api_key_parser)]
-    api_key: String,
-
     /// Text to prepend to the message as context.
     context: Vec<String>,
 
@@ -104,6 +100,36 @@ struct Cli {
     /// Temperature to use for the chat.
     #[arg(long, default_value_t = 0.7, value_parser = temperature_parser)]
     temperature: f32,
+
+    /// Your OpenAI API key.
+    #[arg(short = 'k', long, env = "OPENAI_API_KEY", value_parser = api_key_parser)]
+    api_key: String,
+}
+
+fn model_parser(model: &str) -> Result<String, String> {
+    match model {
+        "gpt-3.5-turbo" | "gpt-4" => Ok(model.into()),
+        _ => Err(format!("'{model}' is not a valid model name")),
+    }
+}
+
+const TEMPERATURE_RANGE: RangeInclusive<f32> = 0.0..=1.0;
+
+fn temperature_parser(temperature: &str) -> Result<f32, String> {
+    let temperature: f32 = temperature.parse().map_err(|err| format!("{err}"))?;
+    if temperature < *TEMPERATURE_RANGE.start() {
+        Err(format!(
+            "too low (minimum value is {:.1})",
+            *TEMPERATURE_RANGE.start()
+        ))
+    } else if temperature > *TEMPERATURE_RANGE.end() {
+        Err(format!(
+            "too high (maximum value is {:.1})",
+            *TEMPERATURE_RANGE.end()
+        ))
+    } else {
+        Ok(temperature)
+    }
 }
 
 const API_KEY_RANGE: RangeInclusive<usize> = 40..=50;
@@ -135,32 +161,6 @@ fn api_key_parser(api_key: &str) -> Result<String, String> {
     }
 
     Ok(api_key.into())
-}
-
-fn model_parser(model: &str) -> Result<String, String> {
-    match model {
-        "gpt-3.5-turbo" | "gpt-4" => Ok(model.into()),
-        _ => Err(format!("'{model}' is not a valid model name")),
-    }
-}
-
-const TEMPERATURE_RANGE: RangeInclusive<f32> = 0.0..=1.0;
-
-fn temperature_parser(temperature: &str) -> Result<f32, String> {
-    let temperature: f32 = temperature.parse().map_err(|err| format!("{err}"))?;
-    if temperature < *TEMPERATURE_RANGE.start() {
-        Err(format!(
-            "too low (minimum value is {:.1})",
-            *TEMPERATURE_RANGE.start()
-        ))
-    } else if temperature > *TEMPERATURE_RANGE.end() {
-        Err(format!(
-            "too high (maximum value is {:.1})",
-            *TEMPERATURE_RANGE.end()
-        ))
-    } else {
-        Ok(temperature)
-    }
 }
 
 #[tokio::main]
