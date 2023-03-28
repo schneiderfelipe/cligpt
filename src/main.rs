@@ -245,6 +245,7 @@ async fn main() -> eyre::Result<()> {
 
     let context = cli.context.join(" ");
     let message = format!("{context} {message}");
+    eyre::ensure!(!message.is_empty(), "cannot use empty string as message");
 
     let api_key = cli.api_key;
     let model = cli.model;
