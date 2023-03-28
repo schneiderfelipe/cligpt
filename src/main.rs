@@ -115,6 +115,7 @@ enum Model {
 }
 
 impl fmt::Display for Model {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Model::Gpt35Turbo => write!(f, "gpt-3.5-turbo"),
@@ -124,6 +125,7 @@ impl fmt::Display for Model {
 }
 
 impl From<Model> for String {
+    #[inline]
     fn from(val: Model) -> Self {
         format!("{val}")
     }
@@ -132,6 +134,7 @@ impl From<Model> for String {
 impl FromStr for Model {
     type Err = String;
 
+    #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "gpt-3.5-turbo" => Ok(Self::Gpt35Turbo),
@@ -143,6 +146,7 @@ impl FromStr for Model {
 
 const TEMPERATURE_RANGE: RangeInclusive<f32> = 0.0..=1.0;
 
+#[inline]
 fn temperature_parser(temperature: &str) -> Result<f32, String> {
     let temperature: f32 = temperature.parse().map_err(|err| format!("{err}"))?;
     if temperature < *TEMPERATURE_RANGE.start() {
@@ -163,6 +167,7 @@ fn temperature_parser(temperature: &str) -> Result<f32, String> {
 const API_KEY_RANGE: RangeInclusive<usize> = 40..=50;
 
 // Logic from <https://docs.gitguardian.com/secrets-detection/detectors/specifics/openai_apikey>.
+#[inline]
 fn api_key_parser(api_key: &str) -> Result<String, String> {
     if !api_key.starts_with("sk-") {
         return Err(format!("'{api_key}' does not start with 'sk-'"));
