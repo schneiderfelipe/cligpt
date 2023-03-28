@@ -73,7 +73,10 @@
 //!
 //! This will send the message `'Hello, ChatGPT!'` to the `ChatGPT` API using your API key and print the generated text to your terminal.
 
-use std::io::{self, Read};
+use std::{
+    io::{self, Read},
+    ops::RangeInclusive,
+};
 
 use async_openai::{
     types::{ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs},
@@ -103,29 +106,38 @@ struct Cli {
     temperature: f32,
 }
 
-fn api_key_parser(key: &str) -> Result<String, String> {
-    if key.starts_with("sk-") && key.len() == 32 {
-        Ok(key.into())
-    } else {
-        Err(format!("{key} has not a valid API key format"))
+// Logic from <https://docs.gitguardian.com/secrets-detection/detectors/specifics/openai_apikey>.
+fn api_key_parser(api_key: &str) -> Result<String, String> {
+    if let Some(suffix) = api_key.strip_prefix("sk-") {
+        if suffix.chars().all(|c| c.is_ascii_alphanumeric()) && (40..=50).contains(&suffix.len()) {
+            return Ok(api_key.into());
+        }
     }
+
+    Err(format!("'{api_key}' is not in valid API key format"))
 }
 
 fn model_parser(model: &str) -> Result<String, String> {
     match model {
         "gpt-3.5-turbo" | "gpt-4" => Ok(model.into()),
-        _ => Err(format!("{model} is not a valid model")),
+        _ => Err(format!("'{model}' is not a valid model")),
     }
 }
 
-fn temperature_parser(temp: &str) -> Result<f32, String> {
-    let temp: f32 = temp
+const TEMPERATURE_RANGE: RangeInclusive<f32> = 0.0..=1.0;
+
+fn temperature_parser(temperature: &str) -> Result<f32, String> {
+    let temperature: f32 = temperature
         .parse()
-        .map_err(|_| format!("{temp} is not a valid float value"))?;
-    if (0.0..=1.0).contains(&temp) {
-        Ok(temp)
+        .map_err(|err| format!("'{temperature}' is not a valid float value: {err}"))?;
+    if TEMPERATURE_RANGE.contains(&temperature) {
+        Ok(temperature)
     } else {
-        Err(format!("{temp} is not between zero and one, inclusive"))
+        Err(format!(
+            "'{temperature}' not in range {}-{} (inclusive)",
+            TEMPERATURE_RANGE.start(),
+            TEMPERATURE_RANGE.end()
+        ))
     }
 }
 
