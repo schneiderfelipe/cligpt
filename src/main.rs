@@ -202,6 +202,10 @@ fn api_key_parser(api_key: &str) -> eyre::Result<String> {
         !api_key.is_empty(),
         "cannot use empty string as OpenAI API key"
     );
+    eyre::ensure!(
+        !api_key.trim().is_empty(),
+        "cannot use all-whitespace string as OpenAI API key"
+    );
 
     eyre::ensure!(
         api_key.starts_with("sk-"),
@@ -246,6 +250,10 @@ async fn main() -> eyre::Result<()> {
     let context = cli.context.join(" ");
     let message = format!("{context} {message}");
     eyre::ensure!(!message.is_empty(), "cannot use empty string as message");
+    eyre::ensure!(
+        !message.trim().is_empty(),
+        "cannot use all-whitespace string as message"
+    );
 
     let api_key = cli.api_key;
     let model = cli.model;
