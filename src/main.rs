@@ -74,10 +74,8 @@
 //! This will send the message `'Hello, ChatGPT!'` to the `ChatGPT` API using your API key and print the generated text to your terminal.
 
 use std::{
-    fmt,
     io::{self, Read},
     ops::RangeInclusive,
-    str::FromStr,
 };
 
 use async_openai::{
@@ -120,32 +118,12 @@ enum Model {
     Gpt4,
 }
 
-impl fmt::Display for Model {
+impl Model {
     #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn name(self) -> &'static str {
         match self {
-            Model::Gpt35 => write!(f, "gpt-3.5-turbo"),
-            Model::Gpt4 => write!(f, "gpt-4"),
-        }
-    }
-}
-
-impl From<Model> for String {
-    #[inline]
-    fn from(val: Model) -> Self {
-        format!("{val}")
-    }
-}
-
-impl FromStr for Model {
-    type Err = String;
-
-    #[inline]
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "gpt-3.5-turbo" => Ok(Self::Gpt35),
-            "gpt-4" => Ok(Self::Gpt4),
-            _ => Err(format!("'{s}' is not a valid model name")),
+            Model::Gpt35 => "gpt-3.5-turbo",
+            Model::Gpt4 => "gpt-4",
         }
     }
 }
@@ -222,7 +200,7 @@ async fn main() -> eyre::Result<()> {
 
     let client = Client::new().with_api_key(api_key);
     let request = CreateChatCompletionRequestArgs::default()
-        .model(model)
+        .model(model.name())
         .temperature(temperature)
         .messages([ChatCompletionRequestMessageArgs::default()
             .content(message)
