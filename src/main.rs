@@ -102,7 +102,7 @@ struct Cli {
     temperature: f32,
 
     /// Your OpenAI API key.
-    #[arg(short = 'k', long, env = "OPENAI_API_KEY", value_parser = api_key_parser)]
+    #[arg(short = 'k', long, value_parser = api_key_parser, env = "OPENAI_API_KEY")]
     api_key: String,
 }
 
