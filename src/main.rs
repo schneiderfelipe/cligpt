@@ -131,50 +131,50 @@ impl Model {
 const TEMPERATURE_RANGE: RangeInclusive<f32> = 0.0..=1.0;
 
 #[inline]
-fn temperature_parser(temperature: &str) -> Result<f32, String> {
-    let temperature: f32 = temperature.parse().map_err(|err| format!("{err}"))?;
+fn temperature_parser(temperature: &str) -> eyre::Result<f32> {
+    let temperature: f32 = temperature.parse()?;
     if temperature < *TEMPERATURE_RANGE.start() {
-        Err(format!(
+        eyre::bail!(
             "too low (minimum value is {:.1})",
             *TEMPERATURE_RANGE.start()
-        ))
-    } else if temperature > *TEMPERATURE_RANGE.end() {
-        Err(format!(
+        )
+    }
+    if temperature > *TEMPERATURE_RANGE.end() {
+        eyre::bail!(
             "too high (maximum value is {:.1})",
             *TEMPERATURE_RANGE.end()
-        ))
-    } else {
-        Ok(temperature)
+        )
     }
+
+    Ok(temperature)
 }
 
 const API_KEY_RANGE: RangeInclusive<usize> = 40..=50;
 
 // Logic from <https://docs.gitguardian.com/secrets-detection/detectors/specifics/openai_apikey>.
 #[inline]
-fn api_key_parser(api_key: &str) -> Result<String, String> {
+fn api_key_parser(api_key: &str) -> eyre::Result<String> {
     if !api_key.starts_with("sk-") {
-        return Err(format!("'{api_key}' does not start with 'sk-'"));
+        eyre::bail!("'{api_key}' does not start with 'sk-'");
     }
 
     let suffix = &api_key[3..];
     if let Some(offending_char) = suffix.chars().find(|c| !c.is_ascii_alphanumeric()) {
-        return Err(format!(
-            "'{api_key}' contains invalid character '{offending_char}'"
-        ));
+        eyre::bail!("'{api_key}' contains invalid character '{offending_char}'");
     }
 
     let key_len = suffix.len();
     if key_len < *API_KEY_RANGE.start() {
-        return Err(format!(
+        eyre::bail!(
             "'{api_key}' is too short (expected at least {} characters)",
             API_KEY_RANGE.start()
-        ));
-    } else if key_len > *API_KEY_RANGE.end() {
-        return Err(format!(
+        );
+    }
+    if key_len > *API_KEY_RANGE.end() {
+        eyre::bail!(
             "'{api_key}' is too long (expected at most {} characters)",
             API_KEY_RANGE.end()
-        ));
+        );
     }
 
     Ok(api_key.into())
