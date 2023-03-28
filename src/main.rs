@@ -88,19 +88,45 @@ use futures_util::StreamExt;
 #[command(version, author, about)]
 struct Cli {
     /// Your OpenAI API key.
-    #[arg(short = 'k', long, env = "OPENAI_API_KEY")]
+    #[arg(short = 'k', long, env = "OPENAI_API_KEY", value_parser = api_key_parser)]
     api_key: String,
 
     /// Text to prepend to the message as context.
     context: Vec<String>,
 
     /// Model to use for the chat.
-    #[arg(long, default_value_t = String::from("gpt-3.5-turbo"))]
+    #[arg(long, default_value = "gpt-3.5-turbo", value_parser = model_parser)]
     model: String,
 
     /// Temperature to use for the chat.
-    #[arg(long, default_value_t = 0.7)]
+    #[arg(long, default_value_t = 0.7, value_parser = temperature_parser)]
     temperature: f32,
+}
+
+fn api_key_parser(key: &str) -> Result<String, String> {
+    if key.starts_with("sk-") && key.len() == 32 {
+        Ok(key.into())
+    } else {
+        Err(format!("{key} has not a valid API key format"))
+    }
+}
+
+fn model_parser(model: &str) -> Result<String, String> {
+    match model {
+        "gpt-3.5-turbo" | "gpt-4" => Ok(model.into()),
+        _ => Err(format!("{model} is not a valid model")),
+    }
+}
+
+fn temperature_parser(temp: &str) -> Result<f32, String> {
+    let temp: f32 = temp
+        .parse()
+        .map_err(|_| format!("{temp} is not a valid float value"))?;
+    if (0.0..=1.0).contains(&temp) {
+        Ok(temp)
+    } else {
+        Err(format!("{temp} is not between zero and one, inclusive"))
+    }
 }
 
 #[tokio::main]
@@ -123,7 +149,7 @@ async fn main() -> eyre::Result<()> {
 
     let client = Client::new().with_api_key(api_key);
     let request = CreateChatCompletionRequestArgs::default()
-        .model(&model)
+        .model(model)
         .temperature(temperature)
         .messages([ChatCompletionRequestMessageArgs::default()
             .content(message)
