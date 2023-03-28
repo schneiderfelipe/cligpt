@@ -80,7 +80,7 @@ use async_openai::{
     Client,
 };
 use clap::Parser;
-use color_eyre::eyre::Context;
+use color_eyre::eyre::{self, Context};
 use futures_util::StreamExt;
 
 /// A command-line interface to talk to `ChatGPT`.
@@ -104,7 +104,7 @@ struct Cli {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), color_eyre::eyre::Error> {
+async fn main() -> eyre::Result<()> {
     color_eyre::install().context("failed to install error report handler")?;
 
     let cli = Cli::parse();
