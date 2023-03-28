@@ -93,6 +93,14 @@ struct Cli {
 
     /// Text to prepend to the message as context.
     context: Vec<String>,
+
+    /// Model to use for the chat.
+    #[arg(long, default_value_t = String::from("gpt-3.5-turbo"))]
+    model: String,
+
+    /// Temperature to use for the chat.
+    #[arg(long, default_value_t = 0.7)]
+    temperature: f32,
 }
 
 #[tokio::main]
@@ -110,11 +118,13 @@ async fn main() -> Result<(), color_eyre::eyre::Error> {
     let message = format!("{context} {message}");
 
     let api_key = cli.api_key;
+    let model = cli.model;
+    let temperature = cli.temperature;
 
     let client = Client::new().with_api_key(api_key);
     let request = CreateChatCompletionRequestArgs::default()
-        .model("gpt-3.5-turbo")
-        .temperature(0.7)
+        .model(&model)
+        .temperature(temperature)
         .messages([ChatCompletionRequestMessageArgs::default()
             .content(message)
             .build()
