@@ -74,6 +74,7 @@
 //! This will send the message `'Hello, ChatGPT!'` to the `ChatGPT` API using your API key and print the generated text to your terminal.
 
 use std::{
+    fmt,
     io::{self, Read},
     ops::RangeInclusive,
 };
@@ -95,7 +96,7 @@ struct Cli {
 
     /// Model to use for the chat.
     #[arg(long, default_value = "gpt-3.5-turbo", value_parser = model_parser)]
-    model: String,
+    model: Model,
 
     /// Temperature to use for the chat.
     #[arg(long, default_value_t = 0.7, value_parser = temperature_parser)]
@@ -106,9 +107,31 @@ struct Cli {
     api_key: String,
 }
 
-fn model_parser(model: &str) -> Result<String, String> {
+#[derive(Clone, Copy, Debug)]
+enum Model {
+    Gpt35Turbo,
+    Gpt4,
+}
+
+impl fmt::Display for Model {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Model::Gpt35Turbo => write!(f, "gpt-3.5-turbo"),
+            Model::Gpt4 => write!(f, "gpt-4"),
+        }
+    }
+}
+
+impl From<Model> for String {
+    fn from(val: Model) -> Self {
+        format!("{val}")
+    }
+}
+
+fn model_parser(model: &str) -> Result<Model, String> {
     match model {
-        "gpt-3.5-turbo" | "gpt-4" => Ok(model.into()),
+        "gpt-3.5-turbo" => Ok(Model::Gpt35Turbo),
+        "gpt-4" => Ok(Model::Gpt4),
         _ => Err(format!("'{model}' is not a valid model name")),
     }
 }
