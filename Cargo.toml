@@ -12,7 +12,7 @@ rust-version = "1.65.0"
 
 [dependencies]
 async-openai = "0.10.1"
-clap = { version = "4.1.14", features = ["derive", "env", "wrap_help"] }
+clap = { version = "4.2.0", features = ["derive", "env", "wrap_help"] }
 color-eyre = "0.6.2"
 futures-util = { version = "0.3.27", default-features = false }
 tokio = { version = "1.27.0", features = [

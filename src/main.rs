@@ -179,18 +179,16 @@ const TEMPERATURE_RANGE: RangeInclusive<f32> = 0.0..=1.0;
 #[inline]
 fn temperature_parser(temperature: &str) -> eyre::Result<f32> {
     let temperature: f32 = temperature.parse()?;
-    if temperature < *TEMPERATURE_RANGE.start() {
-        eyre::bail!(
-            "too low (minimum value is {:.1})",
-            *TEMPERATURE_RANGE.start()
-        )
-    }
-    if temperature > *TEMPERATURE_RANGE.end() {
-        eyre::bail!(
-            "too high (maximum value is {:.1})",
-            *TEMPERATURE_RANGE.end()
-        )
-    }
+    eyre::ensure!(
+        temperature >= *TEMPERATURE_RANGE.start(),
+        "too low (minimum value is {:.1})",
+        *TEMPERATURE_RANGE.start()
+    );
+    eyre::ensure!(
+        temperature <= *TEMPERATURE_RANGE.end(),
+        "too high (maximum value is {:.1})",
+        *TEMPERATURE_RANGE.end()
+    );
 
     Ok(temperature)
 }
@@ -200,13 +198,19 @@ const API_KEY_RANGE: RangeInclusive<usize> = 40..=50;
 // Logic from <https://docs.gitguardian.com/secrets-detection/detectors/specifics/openai_apikey>.
 #[inline]
 fn api_key_parser(api_key: &str) -> eyre::Result<String> {
-    if api_key.is_empty() {
-        eyre::bail!("cannot use empty string as OpenAI API key");
-    }
+    eyre::ensure!(
+        !api_key.is_empty(),
+        "cannot use empty string as OpenAI API key"
+    );
+    eyre::ensure!(
+        !api_key.trim().is_empty(),
+        "cannot use all-whitespace string as OpenAI API key"
+    );
 
-    if !api_key.starts_with("sk-") {
-        eyre::bail!("'{api_key}' does not start with 'sk-'");
-    }
+    eyre::ensure!(
+        api_key.starts_with("sk-"),
+        "'{api_key}' does not start with 'sk-'"
+    );
 
     let suffix = &api_key[3..];
     if let Some(offending_char) = suffix.chars().find(|c| !c.is_ascii_alphanumeric()) {
@@ -214,18 +218,16 @@ fn api_key_parser(api_key: &str) -> eyre::Result<String> {
     }
 
     let key_len = suffix.len();
-    if key_len < *API_KEY_RANGE.start() {
-        eyre::bail!(
-            "'{api_key}' is too short (expected at least {} characters)",
-            API_KEY_RANGE.start()
-        );
-    }
-    if key_len > *API_KEY_RANGE.end() {
-        eyre::bail!(
-            "'{api_key}' is too long (expected at most {} characters)",
-            API_KEY_RANGE.end()
-        );
-    }
+    eyre::ensure!(
+        key_len >= *API_KEY_RANGE.start(),
+        "'{api_key}' is too short (expected at least {} characters)",
+        API_KEY_RANGE.start()
+    );
+    eyre::ensure!(
+        key_len <= *API_KEY_RANGE.end(),
+        "'{api_key}' is too long (expected at most {} characters)",
+        API_KEY_RANGE.end()
+    );
 
     Ok(api_key.into())
 }
@@ -246,7 +248,16 @@ async fn main() -> eyre::Result<()> {
     };
 
     let context = cli.context.join(" ");
-    let message = format!("{context} {message}");
+    let message = match (context.is_empty(), message.is_empty()) {
+        (false, false) => [context, message].join(" "),
+        (false, true) => context,
+        (true, false) => message,
+        (true, true) => eyre::bail!("cannot use empty string as chat message"),
+    };
+    eyre::ensure!(
+        !message.trim().is_empty(),
+        "cannot use all-whitespace string as chat message"
+    );
 
     let api_key = cli.api_key;
     let model = cli.model;
@@ -259,7 +270,7 @@ async fn main() -> eyre::Result<()> {
         .messages([ChatCompletionRequestMessageArgs::default()
             .content(message)
             .build()
-            .context("failed to build a message")?])
+            .context("failed to build chat message")?])
         .build()
         .context("failed to build the completion request")?;
     let mut stream = client
