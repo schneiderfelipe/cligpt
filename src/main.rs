@@ -114,7 +114,6 @@ async fn main() -> Result<(), color_eyre::eyre::Error> {
     let client = Client::new().with_api_key(api_key);
     let request = CreateChatCompletionRequestArgs::default()
         .model("gpt-3.5-turbo")
-        .max_tokens(1024u16)
         .temperature(0.7)
         .messages([ChatCompletionRequestMessageArgs::default()
             .content(message)
