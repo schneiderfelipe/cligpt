@@ -140,24 +140,26 @@ fn api_key_parser(api_key: &str) -> Result<String, String> {
 fn model_parser(model: &str) -> Result<String, String> {
     match model {
         "gpt-3.5-turbo" | "gpt-4" => Ok(model.into()),
-        _ => Err(format!("'{model}' is not a valid model")),
+        _ => Err(format!("'{model}' is not a valid model name")),
     }
 }
 
 const TEMPERATURE_RANGE: RangeInclusive<f32> = 0.0..=1.0;
 
 fn temperature_parser(temperature: &str) -> Result<f32, String> {
-    let temperature: f32 = temperature
-        .parse()
-        .map_err(|err| format!("'{temperature}' is not a valid float value: {err}"))?;
-    if TEMPERATURE_RANGE.contains(&temperature) {
-        Ok(temperature)
-    } else {
+    let temperature: f32 = temperature.parse().map_err(|err| format!("{err}"))?;
+    if temperature < *TEMPERATURE_RANGE.start() {
         Err(format!(
-            "'{temperature}' not in range {}-{} (inclusive)",
-            TEMPERATURE_RANGE.start(),
-            TEMPERATURE_RANGE.end()
+            "too low (minimum value is {:.1})",
+            *TEMPERATURE_RANGE.start()
         ))
+    } else if temperature > *TEMPERATURE_RANGE.end() {
+        Err(format!(
+            "too high (maximum value is {:.1})",
+            *TEMPERATURE_RANGE.end()
+        ))
+    } else {
+        Ok(temperature)
     }
 }
 
