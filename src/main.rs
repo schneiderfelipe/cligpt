@@ -73,30 +73,119 @@
 //!
 //! This will send the message `'Hello, ChatGPT!'` to the `ChatGPT` API using your API key and print the generated text to your terminal.
 
-use std::io::{self, Read};
+use std::{
+    io::{self, Read},
+    ops::RangeInclusive,
+};
 
 use async_openai::{
     types::{ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs},
     Client,
 };
-use clap::Parser;
-use color_eyre::eyre::Context;
+use clap::{Parser, ValueEnum};
+use color_eyre::eyre::{self, Context};
 use futures_util::StreamExt;
 
 /// A command-line interface to talk to `ChatGPT`.
 #[derive(Debug, Parser)]
 #[command(version, author, about)]
 struct Cli {
-    /// Your OpenAI API key.
-    #[arg(short = 'k', long, env = "OPENAI_API_KEY")]
-    api_key: String,
-
     /// Text to prepend to the message as context.
     context: Vec<String>,
+
+    /// Model to use for the chat.
+    #[arg(long, value_enum, default_value_t = Default::default())]
+    model: Model,
+
+    /// Temperature to use for the chat.
+    #[arg(long, default_value_t = 0.7, value_parser = temperature_parser)]
+    temperature: f32,
+
+    /// Your OpenAI API key.
+    #[arg(short = 'k', long, value_parser = api_key_parser, env = "OPENAI_API_KEY")]
+    api_key: String,
+}
+
+/// Different language models that can be used for natural language processing tasks.
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
+enum Model {
+    /// A highly capable GPT-3.5 model optimized for chat at a reduced cost.
+    #[default]
+    Gpt35,
+
+    /// A more capable model than any GPT-3.5,
+    /// designed for complex tasks and optimized for chat.
+    Gpt4,
+}
+
+impl Model {
+    #[inline]
+    fn name(self) -> &'static str {
+        match self {
+            Model::Gpt35 => "gpt-3.5-turbo",
+            Model::Gpt4 => "gpt-4",
+        }
+    }
+}
+
+const TEMPERATURE_RANGE: RangeInclusive<f32> = 0.0..=1.0;
+
+#[inline]
+fn temperature_parser(temperature: &str) -> eyre::Result<f32> {
+    let temperature: f32 = temperature.parse()?;
+    if temperature < *TEMPERATURE_RANGE.start() {
+        eyre::bail!(
+            "too low (minimum value is {:.1})",
+            *TEMPERATURE_RANGE.start()
+        )
+    }
+    if temperature > *TEMPERATURE_RANGE.end() {
+        eyre::bail!(
+            "too high (maximum value is {:.1})",
+            *TEMPERATURE_RANGE.end()
+        )
+    }
+
+    Ok(temperature)
+}
+
+const API_KEY_RANGE: RangeInclusive<usize> = 40..=50;
+
+// Logic from <https://docs.gitguardian.com/secrets-detection/detectors/specifics/openai_apikey>.
+#[inline]
+fn api_key_parser(api_key: &str) -> eyre::Result<String> {
+    if api_key.is_empty() {
+        eyre::bail!("cannot use empty string as OpenAI API key");
+    }
+
+    if !api_key.starts_with("sk-") {
+        eyre::bail!("'{api_key}' does not start with 'sk-'");
+    }
+
+    let suffix = &api_key[3..];
+    if let Some(offending_char) = suffix.chars().find(|c| !c.is_ascii_alphanumeric()) {
+        eyre::bail!("'{api_key}' contains invalid character '{offending_char}'");
+    }
+
+    let key_len = suffix.len();
+    if key_len < *API_KEY_RANGE.start() {
+        eyre::bail!(
+            "'{api_key}' is too short (expected at least {} characters)",
+            API_KEY_RANGE.start()
+        );
+    }
+    if key_len > *API_KEY_RANGE.end() {
+        eyre::bail!(
+            "'{api_key}' is too long (expected at most {} characters)",
+            API_KEY_RANGE.end()
+        );
+    }
+
+    Ok(api_key.into())
 }
 
 #[tokio::main]
-async fn main() -> Result<(), color_eyre::eyre::Error> {
+async fn main() -> eyre::Result<()> {
     color_eyre::install().context("failed to install error report handler")?;
 
     let cli = Cli::parse();
@@ -110,12 +199,13 @@ async fn main() -> Result<(), color_eyre::eyre::Error> {
     let message = format!("{context} {message}");
 
     let api_key = cli.api_key;
+    let model = cli.model;
+    let temperature = cli.temperature;
 
     let client = Client::new().with_api_key(api_key);
     let request = CreateChatCompletionRequestArgs::default()
-        .model("gpt-3.5-turbo")
-        .max_tokens(1024u16)
-        .temperature(0.7)
+        .model(model.name())
+        .temperature(temperature)
         .messages([ChatCompletionRequestMessageArgs::default()
             .content(message)
             .build()
@@ -143,11 +233,12 @@ async fn main() -> Result<(), color_eyre::eyre::Error> {
 
 #[cfg(test)]
 mod tests {
+    use clap::CommandFactory;
+
     use super::*;
 
     #[test]
     fn verify_cli() {
-        use clap::CommandFactory;
         Cli::command().debug_assert();
     }
 }
