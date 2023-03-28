@@ -154,6 +154,10 @@ const API_KEY_RANGE: RangeInclusive<usize> = 40..=50;
 // Logic from <https://docs.gitguardian.com/secrets-detection/detectors/specifics/openai_apikey>.
 #[inline]
 fn api_key_parser(api_key: &str) -> eyre::Result<String> {
+    if api_key.is_empty() {
+        eyre::bail!("cannot use empty string as OpenAI API key");
+    }
+
     if !api_key.starts_with("sk-") {
         eyre::bail!("'{api_key}' does not start with 'sk-'");
     }
