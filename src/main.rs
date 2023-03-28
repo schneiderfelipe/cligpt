@@ -77,6 +77,7 @@ use std::{
     fmt,
     io::{self, Read},
     ops::RangeInclusive,
+    str::FromStr,
 };
 
 use async_openai::{
@@ -95,7 +96,7 @@ struct Cli {
     context: Vec<String>,
 
     /// Model to use for the chat.
-    #[arg(long, default_value = "gpt-3.5-turbo", value_parser = model_parser)]
+    #[arg(long, default_value = "gpt-3.5-turbo")]
     model: Model,
 
     /// Temperature to use for the chat.
@@ -128,11 +129,15 @@ impl From<Model> for String {
     }
 }
 
-fn model_parser(model: &str) -> Result<Model, String> {
-    match model {
-        "gpt-3.5-turbo" => Ok(Model::Gpt35Turbo),
-        "gpt-4" => Ok(Model::Gpt4),
-        _ => Err(format!("'{model}' is not a valid model name")),
+impl FromStr for Model {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "gpt-3.5-turbo" => Ok(Self::Gpt35Turbo),
+            "gpt-4" => Ok(Self::Gpt4),
+            _ => Err(format!("'{s}' is not a valid model name")),
+        }
     }
 }
 
