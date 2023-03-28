@@ -84,7 +84,7 @@ use async_openai::{
     types::{ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs},
     Client,
 };
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use color_eyre::eyre::{self, Context};
 use futures_util::StreamExt;
 
@@ -96,7 +96,7 @@ struct Cli {
     context: Vec<String>,
 
     /// Model to use for the chat.
-    #[arg(long, default_value_t = Default::default())]
+    #[arg(long, value_enum, default_value_t = Default::default())]
     model: Model,
 
     /// Temperature to use for the chat.
@@ -108,7 +108,7 @@ struct Cli {
     api_key: String,
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
 enum Model {
     #[default]
     Gpt35Turbo,
