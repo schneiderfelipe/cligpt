@@ -249,10 +249,13 @@ async fn main() -> eyre::Result<()> {
 
     let context = cli.context.join(" ");
     let message = format!("{context} {message}");
-    eyre::ensure!(!message.is_empty(), "cannot use empty string as message");
+    eyre::ensure!(
+        !message.is_empty(),
+        "cannot use empty string as chat message"
+    );
     eyre::ensure!(
         !message.trim().is_empty(),
-        "cannot use all-whitespace string as message"
+        "cannot use all-whitespace string as chat message"
     );
 
     let api_key = cli.api_key;
@@ -266,7 +269,7 @@ async fn main() -> eyre::Result<()> {
         .messages([ChatCompletionRequestMessageArgs::default()
             .content(message)
             .build()
-            .context("failed to build a message")?])
+            .context("failed to build chat message")?])
         .build()
         .context("failed to build the completion request")?;
     let mut stream = client
