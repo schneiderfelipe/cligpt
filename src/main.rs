@@ -110,8 +110,12 @@ struct Cli {
 
 #[derive(Clone, Copy, Debug, Default, ValueEnum)]
 enum Model {
+    /// Most capable GPT-3.5 model and optimized for chat at 1/10th the cost of text-davinci-003.
     #[default]
-    Gpt35Turbo,
+    Gpt35,
+    /// More capable than any GPT-3.5 model,
+    /// able to do more complex tasks,
+    /// and optimized for chat.
     Gpt4,
 }
 
@@ -119,7 +123,7 @@ impl fmt::Display for Model {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Model::Gpt35Turbo => write!(f, "gpt-3.5-turbo"),
+            Model::Gpt35 => write!(f, "gpt-3.5-turbo"),
             Model::Gpt4 => write!(f, "gpt-4"),
         }
     }
@@ -138,7 +142,7 @@ impl FromStr for Model {
     #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "gpt-3.5-turbo" => Ok(Self::Gpt35Turbo),
+            "gpt-3.5-turbo" => Ok(Self::Gpt35),
             "gpt-4" => Ok(Self::Gpt4),
             _ => Err(format!("'{s}' is not a valid model name")),
         }
