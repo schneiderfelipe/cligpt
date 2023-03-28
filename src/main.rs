@@ -96,7 +96,7 @@ struct Cli {
     context: Vec<String>,
 
     /// Model to use for the chat.
-    #[arg(long, default_value = "gpt-3.5-turbo")]
+    #[arg(long, default_value_t = Default::default())]
     model: Model,
 
     /// Temperature to use for the chat.
@@ -108,8 +108,9 @@ struct Cli {
     api_key: String,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 enum Model {
+    #[default]
     Gpt35Turbo,
     Gpt4,
 }
