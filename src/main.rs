@@ -218,15 +218,16 @@ async fn main() -> eyre::Result<()> {
         .await
         .context("failed to create the completion stream")?;
 
+    let stdout = io::stdout().lock();
     while let Some(result) = stream.next().await {
         let response = result.context("failed to obtain a stream response")?;
         if let Some(choice) = response.choices.get(0) {
             if let Some(text) = &choice.delta.content {
-                print!("{text}");
+                write!(stdout, text);
             }
         }
     }
-    println!();
+    writeln!(stdout);
 
     Ok(())
 }
