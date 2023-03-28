@@ -106,15 +106,35 @@ struct Cli {
     temperature: f32,
 }
 
+const API_KEY_RANGE: RangeInclusive<usize> = 40..=50;
+
 // Logic from <https://docs.gitguardian.com/secrets-detection/detectors/specifics/openai_apikey>.
 fn api_key_parser(api_key: &str) -> Result<String, String> {
-    if let Some(suffix) = api_key.strip_prefix("sk-") {
-        if suffix.chars().all(|c| c.is_ascii_alphanumeric()) && (40..=50).contains(&suffix.len()) {
-            return Ok(api_key.into());
-        }
+    if !api_key.starts_with("sk-") {
+        return Err(format!("'{api_key}' does not start with 'sk-'"));
     }
 
-    Err(format!("'{api_key}' is not in valid API key format"))
+    let suffix = &api_key[3..];
+    if let Some(offending_char) = suffix.chars().find(|c| !c.is_ascii_alphanumeric()) {
+        return Err(format!(
+            "'{api_key}' contains invalid character '{offending_char}'"
+        ));
+    }
+
+    let key_len = suffix.len();
+    if key_len < *API_KEY_RANGE.start() {
+        return Err(format!(
+            "'{api_key}' is too short (expected at least {} characters)",
+            API_KEY_RANGE.start()
+        ));
+    } else if key_len > *API_KEY_RANGE.end() {
+        return Err(format!(
+            "'{api_key}' is too long (expected at most {} characters)",
+            API_KEY_RANGE.end()
+        ));
+    }
+
+    Ok(api_key.into())
 }
 
 fn model_parser(model: &str) -> Result<String, String> {
