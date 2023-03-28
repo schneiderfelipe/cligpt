@@ -108,14 +108,15 @@ struct Cli {
     api_key: String,
 }
 
+/// Different language models that can be used for natural language processing tasks.
 #[derive(Clone, Copy, Debug, Default, ValueEnum)]
 enum Model {
-    /// Most capable GPT-3.5 model and optimized for chat at 1/10th the cost of text-davinci-003.
+    /// A highly capable GPT-3.5 model optimized for chat at a reduced cost.
     #[default]
     Gpt35,
-    /// More capable than any GPT-3.5 model,
-    /// able to do more complex tasks,
-    /// and optimized for chat.
+
+    /// A more capable model than any GPT-3.5,
+    /// designed for complex tasks and optimized for chat.
     Gpt4,
 }
 
