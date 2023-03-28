@@ -248,11 +248,12 @@ async fn main() -> eyre::Result<()> {
     };
 
     let context = cli.context.join(" ");
-    let message = format!("{context} {message}");
-    eyre::ensure!(
-        !message.is_empty(),
-        "cannot use empty string as chat message"
-    );
+    let message = match (context.is_empty(), message.is_empty()) {
+        (false, false) => [context, message].join(" "),
+        (false, true) => context,
+        (true, false) => message,
+        (true, true) => eyre::bail!("cannot use empty string as chat message"),
+    };
     eyre::ensure!(
         !message.trim().is_empty(),
         "cannot use all-whitespace string as chat message"
