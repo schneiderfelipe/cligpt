@@ -334,7 +334,7 @@ async fn main() -> eyre::Result<()> {
         };
         messages.push(
             ChatCompletionRequestMessageArgs::default()
-                .content(message)
+                .content(strip_trailing_newline(&message))
                 .build()
                 .context("failed to build chat message")?,
         );
@@ -376,7 +376,7 @@ async fn main() -> eyre::Result<()> {
         };
         messages.push(
             ChatCompletionRequestMessageArgs::default()
-                .content(buffer)
+                .content(strip_trailing_newline(&buffer))
                 .role(Role::Assistant)
                 .build()
                 .context("failed to build chat message")?,
@@ -392,6 +392,15 @@ async fn main() -> eyre::Result<()> {
     Ok(())
 }
 
+// https://stackoverflow.com/a/66401342/4039050
+#[inline]
+fn strip_trailing_newline(input: &str) -> &str {
+    input
+        .strip_suffix("\r\n")
+        .or(input.strip_suffix('\n'))
+        .unwrap_or(input)
+}
+
 #[cfg(test)]
 mod tests {
     use clap::CommandFactory;
@@ -401,5 +410,13 @@ mod tests {
     #[test]
     fn verify_cli() {
         Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn strip_newline_works() {
+        assert_eq!(strip_trailing_newline("Test0\r\n\r\n"), "Test0\r\n");
+        assert_eq!(strip_trailing_newline("Test1\r\n"), "Test1");
+        assert_eq!(strip_trailing_newline("Test2\n"), "Test2");
+        assert_eq!(strip_trailing_newline("Test3"), "Test3");
     }
 }
