@@ -361,6 +361,8 @@ async fn main() -> eyre::Result<()> {
         let buffer = {
             let mut stdout = io::stdout().lock();
             let mut buffer = String::new();
+
+            writeln!(stdout).context("failed to write new line to the standard output")?;
             while let Some(result) = stream.next().await {
                 let response = result.context("failed to obtain a stream response")?;
                 if let Some(choice) = response.choices.get(0) {
