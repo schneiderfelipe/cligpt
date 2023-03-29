@@ -140,12 +140,14 @@
 //! `cligpt` is released under the [MIT License](LICENSE).
 
 use std::{
+    fmt::Write as _,
+    fs::{self, File},
     io::{self, Read, Write},
     ops::RangeInclusive,
 };
 
 use async_openai::{
-    types::{ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs},
+    types::{ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs, Role},
     Client,
 };
 use clap::{Parser, Subcommand, ValueEnum};
@@ -318,7 +320,17 @@ async fn main() -> eyre::Result<()> {
             "cannot use all-whitespace string as chat message"
         );
 
-        let mut messages = Vec::new();
+        let path = "history.chat.json";
+        let mut messages = if true {
+            let contents =
+                fs::read_to_string(path).with_context(|| format!("failed to read from {path}"))?;
+
+            // https://github.com/serde-rs/json/issues/160#issuecomment-253446892
+            serde_json::from_str(&contents)
+                .with_context(|| format!("failed to deserialize contents of {path}"))?
+        } else {
+            Vec::new()
+        };
         messages.push(
             ChatCompletionRequestMessageArgs::default()
                 .content(message)
@@ -334,7 +346,7 @@ async fn main() -> eyre::Result<()> {
         let request = CreateChatCompletionRequestArgs::default()
             .model(model.name())
             .temperature(temperature)
-            .messages(messages)
+            .messages(messages.clone())
             .build()
             .context("failed to build the completion request")?;
         let mut stream = client
@@ -343,18 +355,36 @@ async fn main() -> eyre::Result<()> {
             .await
             .context("failed to create the completion stream")?;
 
-        {
+        let buffer = {
             let mut stdout = io::stdout().lock();
+            let mut buffer = String::new();
             while let Some(result) = stream.next().await {
                 let response = result.context("failed to obtain a stream response")?;
                 if let Some(choice) = response.choices.get(0) {
                     if let Some(text) = &choice.delta.content {
                         write!(stdout, "{text}")
                             .context("failed to write response delta to the standard output")?;
+                        write!(buffer, "{text}")
+                            .context("failed to write response delta to buffer")?;
                     }
                 }
             }
             writeln!(stdout).context("failed to write new line to the standard output")?;
+            writeln!(buffer).context("failed to write new line to buffer")?;
+            buffer
+        };
+        messages.push(
+            ChatCompletionRequestMessageArgs::default()
+                .content(buffer)
+                .role(Role::Assistant)
+                .build()
+                .context("failed to build chat message")?,
+        );
+
+        if true {
+            let file = File::create(path)?;
+            serde_json::to_writer_pretty(file, &messages)
+                .with_context(|| format!("failed to serialize contents to {path}"))?;
         }
     }
 
