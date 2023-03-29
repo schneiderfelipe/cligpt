@@ -320,7 +320,7 @@ async fn main() -> eyre::Result<()> {
             "cannot use all-whitespace string as chat message"
         );
 
-        let path = "history.chat.json";
+        let path = "cligpt.chat.json";
         let mut messages = if true {
             let contents =
                 fs::read_to_string(path).with_context(|| format!("failed to read from {path}"))?;
