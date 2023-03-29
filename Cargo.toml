@@ -11,10 +11,35 @@ rust-version = "1.65.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-openai = "0.10.1"
-clap = { version = "4.2.0", features = ["derive", "env", "wrap_help"] }
-color-eyre = "0.6.2"
+async-openai = { version = "0.10.1", default-features = false }
+clap = { version = "4.2.0", features = [
+  "derive",
+  "env",
+  "std",
+], default-features = false }
+color-eyre = { version = "0.6.2", default-features = false }
+
 futures-util = { version = "0.3.27", default-features = false }
 tokio = { version = "1.27.0", features = [
   "rt-multi-thread",
 ], default-features = false }
+
+[features]
+default = [
+  "color",
+  "error-context",
+  "help",
+  "suggestions",
+  "usage",
+  "wrap-help",
+  "rustls",
+]
+color = ["clap/color"]
+error-context = ["clap/error-context"]
+help = ["clap/help"]
+suggestions = ["clap/suggestions"]
+usage = ["clap/usage"]
+wrap-help = ["clap/wrap_help"]
+
+native-tls = ["async-openai/native-tls"]
+rustls = ["async-openai/rustls"]
