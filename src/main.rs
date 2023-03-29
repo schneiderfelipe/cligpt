@@ -146,7 +146,7 @@ use async_openai::{
     types::{ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs},
     Client,
 };
-use clap::{Parser, ValueEnum};
+use clap::{Parser, Subcommand, ValueEnum};
 use color_eyre::eyre::{self, Context};
 use futures_util::StreamExt;
 
@@ -154,6 +154,9 @@ use futures_util::StreamExt;
 #[derive(Debug, Parser)]
 #[command(version, author, about)]
 struct Cli {
+    #[command(subcommand)]
+    command: Option<Command>,
+
     /// Text to prepend to the message as context.
     context: Vec<String>,
 
@@ -168,6 +171,31 @@ struct Cli {
     /// Your OpenAI API key.
     #[arg(short = 'k', long, value_parser = api_key_parser, env = "OPENAI_API_KEY")]
     api_key: String,
+}
+
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Create a new chat.
+    NewChat,
+    /// List all chats.
+    ListChats,
+    /// Delete a chat.
+    DeleteChat {
+        /// Name or ID of the chat to delete.
+        chat_name: String,
+    },
+    /// Switch to a different chat.
+    SwitchChat {
+        /// Name or ID of the chat to switch to.
+        chat_name: String,
+    },
+    /// Rename a chat.
+    RenameChat {
+        /// Name or ID of the chat to rename.
+        chat_name: String,
+        /// New name of the chat.
+        new_name: String,
+    },
 }
 
 /// Different language models that can be used for natural language processing tasks.
@@ -255,60 +283,72 @@ async fn main() -> eyre::Result<()> {
     color_eyre::install().context("failed to install error report handler")?;
 
     let cli = Cli::parse();
+    if let Some(command) = cli.command {
+        match command {
+            Command::NewChat => todo!(),
+            Command::ListChats => todo!(),
+            Command::DeleteChat { chat_name: _ } => todo!(),
+            Command::SwitchChat { chat_name: _ } => todo!(),
+            Command::RenameChat {
+                chat_name: _,
+                new_name: _,
+            } => todo!(),
+        }
+    } else {
+        let message = {
+            let mut message = String::new();
+            io::stdin()
+                .lock()
+                .read_to_string(&mut message)
+                .context("failed to read from the standard input")?;
+            message
+        };
 
-    let message = {
-        let mut message = String::new();
-        io::stdin()
-            .lock()
-            .read_to_string(&mut message)
-            .context("failed to read from the standard input")?;
-        message
-    };
+        let context = cli.context.join(" ");
+        let message = match (context.is_empty(), message.is_empty()) {
+            (false, false) => [context, message].join(" "),
+            (false, true) => context,
+            (true, false) => message,
+            (true, true) => eyre::bail!("cannot use empty string as chat message"),
+        };
+        eyre::ensure!(
+            !message.trim().is_empty(),
+            "cannot use all-whitespace string as chat message"
+        );
 
-    let context = cli.context.join(" ");
-    let message = match (context.is_empty(), message.is_empty()) {
-        (false, false) => [context, message].join(" "),
-        (false, true) => context,
-        (true, false) => message,
-        (true, true) => eyre::bail!("cannot use empty string as chat message"),
-    };
-    eyre::ensure!(
-        !message.trim().is_empty(),
-        "cannot use all-whitespace string as chat message"
-    );
+        let api_key = cli.api_key;
+        let model = cli.model;
+        let temperature = cli.temperature;
 
-    let api_key = cli.api_key;
-    let model = cli.model;
-    let temperature = cli.temperature;
-
-    let client = Client::new().with_api_key(api_key);
-    let request = CreateChatCompletionRequestArgs::default()
-        .model(model.name())
-        .temperature(temperature)
-        .messages([ChatCompletionRequestMessageArgs::default()
-            .content(message)
+        let client = Client::new().with_api_key(api_key);
+        let request = CreateChatCompletionRequestArgs::default()
+            .model(model.name())
+            .temperature(temperature)
+            .messages([ChatCompletionRequestMessageArgs::default()
+                .content(message)
+                .build()
+                .context("failed to build chat message")?])
             .build()
-            .context("failed to build chat message")?])
-        .build()
-        .context("failed to build the completion request")?;
-    let mut stream = client
-        .chat()
-        .create_stream(request)
-        .await
-        .context("failed to create the completion stream")?;
+            .context("failed to build the completion request")?;
+        let mut stream = client
+            .chat()
+            .create_stream(request)
+            .await
+            .context("failed to create the completion stream")?;
 
-    {
-        let mut stdout = io::stdout().lock();
-        while let Some(result) = stream.next().await {
-            let response = result.context("failed to obtain a stream response")?;
-            if let Some(choice) = response.choices.get(0) {
-                if let Some(text) = &choice.delta.content {
-                    write!(stdout, "{text}")
-                        .context("failed to write response delta to the standard output")?;
+        {
+            let mut stdout = io::stdout().lock();
+            while let Some(result) = stream.next().await {
+                let response = result.context("failed to obtain a stream response")?;
+                if let Some(choice) = response.choices.get(0) {
+                    if let Some(text) = &choice.delta.content {
+                        write!(stdout, "{text}")
+                            .context("failed to write response delta to the standard output")?;
+                    }
                 }
             }
+            writeln!(stdout).context("failed to write new line to the standard output")?;
         }
-        writeln!(stdout).context("failed to write new line to the standard output")?;
     }
 
     Ok(())
