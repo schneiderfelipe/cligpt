@@ -323,6 +323,8 @@ async fn main() -> eyre::Result<()> {
 
         let path = Path::new("cligpt.chat.json");
         let mut messages = if path.try_exists()? {
+            println!("Reading contents from {}", path.display());
+
             let contents = fs::read_to_string(path)
                 .with_context(|| format!("failed to read from {}", path.display()))?;
 
@@ -383,6 +385,8 @@ async fn main() -> eyre::Result<()> {
         );
 
         if true {
+            println!("\nWriting contents to {}", path.display());
+
             let file = File::create(path)?;
             serde_json::to_writer_pretty(file, &messages)
                 .with_context(|| format!("failed to serialize contents to {}", path.display()))?;
