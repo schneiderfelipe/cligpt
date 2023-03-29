@@ -316,6 +316,14 @@ async fn main() -> eyre::Result<()> {
             "cannot use all-whitespace string as chat message"
         );
 
+        let mut messages = Vec::new();
+        messages.push(
+            ChatCompletionRequestMessageArgs::default()
+                .content(message)
+                .build()
+                .context("failed to build chat message")?,
+        );
+
         let api_key = cli.api_key;
         let model = cli.model;
         let temperature = cli.temperature;
@@ -324,10 +332,7 @@ async fn main() -> eyre::Result<()> {
         let request = CreateChatCompletionRequestArgs::default()
             .model(model.name())
             .temperature(temperature)
-            .messages([ChatCompletionRequestMessageArgs::default()
-                .content(message)
-                .build()
-                .context("failed to build chat message")?])
+            .messages(messages)
             .build()
             .context("failed to build the completion request")?;
         let mut stream = client
