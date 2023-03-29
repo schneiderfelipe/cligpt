@@ -107,6 +107,24 @@ the API key will be read from the environment.
 For more information on available options,
 run `cligpt --help`.
 
+## Design decisions
+
+The primary goal of `cligpt` is to provide a user-friendly experience.
+For this reason,
+it is designed to generate only a single response,
+whose maximum length is determined by the
+[`OpenAI` API endpoint](https://platform.openai.com/docs/api-reference/chat/create#chat/create-max_tokens).
+
+As a command-line application,
+`cligpt` allows for the use of
+[pipes and redirections](https://askubuntu.com/q/172982/361183)
+to load and save prompts and generated text,
+making such features of limited use in `cligpt`.
+
+Lastly,
+`cligpt` only supports the
+[chat completion endpoint](https://platform.openai.com/docs/api-reference/chat/create#chat/create-model).
+
 ## Contributing
 
 Contributions to `cligpt` are welcome!
