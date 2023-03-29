@@ -144,6 +144,7 @@ use std::{
     fs::{self, File},
     io::{self, Read, Write},
     ops::RangeInclusive,
+    path::Path,
 };
 
 use async_openai::{
@@ -320,14 +321,14 @@ async fn main() -> eyre::Result<()> {
             "cannot use all-whitespace string as chat message"
         );
 
-        let path = "cligpt.chat.json";
+        let path = Path::new("cligpt.chat.json");
         let mut messages = if true {
-            let contents =
-                fs::read_to_string(path).with_context(|| format!("failed to read from {path}"))?;
+            let contents = fs::read_to_string(path)
+                .with_context(|| format!("failed to read from {}", path.display()))?;
 
             // https://github.com/serde-rs/json/issues/160#issuecomment-253446892
             serde_json::from_str(&contents)
-                .with_context(|| format!("failed to deserialize contents of {path}"))?
+                .with_context(|| format!("failed to deserialize contents of {}", path.display()))?
         } else {
             Vec::new()
         };
@@ -384,7 +385,7 @@ async fn main() -> eyre::Result<()> {
         if true {
             let file = File::create(path)?;
             serde_json::to_writer_pretty(file, &messages)
-                .with_context(|| format!("failed to serialize contents to {path}"))?;
+                .with_context(|| format!("failed to serialize contents to {}", path.display()))?;
         }
     }
 
