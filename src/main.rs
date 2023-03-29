@@ -322,7 +322,7 @@ async fn main() -> eyre::Result<()> {
         );
 
         let path = Path::new("cligpt.chat.json");
-        let mut messages = if true {
+        let mut messages = if path.try_exists()? {
             let contents = fs::read_to_string(path)
                 .with_context(|| format!("failed to read from {}", path.display()))?;
 
