@@ -437,6 +437,16 @@ async fn embed(client: &Client, input: &str) -> eyre::Result<Vec<f32>> {
     Ok(embedding)
 }
 
+// https://github.com/openai/openai-python/blob/47ce29542e7fc496c1cd0bb323293b7991f45bb0/openai/embeddings_utils.py#L67-L68
+#[inline]
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+    #[inline]
+    fn dot(a: &[f32], b: &[f32]) -> f32 {
+        a.iter().zip(b).map(|(a, b)| a * b).sum()
+    }
+    dot(a, b) / (dot(a, a) * dot(b, b)).sqrt()
+}
+
 // https://stackoverflow.com/a/66401342/4039050
 #[inline]
 fn strip_trailing_newline(input: &str) -> &str {
@@ -463,5 +473,12 @@ mod tests {
         assert_eq!(strip_trailing_newline("Test1\r\n"), "Test1");
         assert_eq!(strip_trailing_newline("Test2\n"), "Test2");
         assert_eq!(strip_trailing_newline("Test3"), "Test3");
+    }
+
+    #[test]
+    fn cosine_similarity_works() {
+        assert_eq!(cosine_similarity(&[0.0, 1.0], &[0.0, 1.0]), 1.0);
+        assert_eq!(cosine_similarity(&[0.0, 1.0], &[1.0, 0.0]), 0.0);
+        assert_eq!(cosine_similarity(&[0.0, 1.0], &[0.5, 0.5]), 0.707_106_77);
     }
 }
