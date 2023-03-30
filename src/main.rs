@@ -408,7 +408,7 @@ async fn main() -> eyre::Result<()> {
             eprintln!("\nWriting contents to {}", path.display());
 
             let file = File::create(path)?;
-            serde_json::to_writer_pretty(file, &embedded_messages)
+            serde_json::to_writer(file, &embedded_messages)
                 .with_context(|| format!("failed to serialize contents to {}", path.display()))?;
         }
     }
