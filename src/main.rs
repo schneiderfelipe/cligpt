@@ -148,7 +148,10 @@ use std::{
 };
 
 use async_openai::{
-    types::{ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs, Role},
+    types::{
+        ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs,
+        CreateEmbeddingRequestArgs, Role,
+    },
     Client,
 };
 use clap::{Parser, Subcommand, ValueEnum};
@@ -322,7 +325,7 @@ async fn main() -> eyre::Result<()> {
         );
 
         let path = Path::new("cligpt.chat.json");
-        let mut messages = if path.try_exists()? {
+        let mut embedded_messages = if path.try_exists()? {
             eprintln!("Reading contents from {}", path.display());
 
             let contents = fs::read_to_string(path)
@@ -334,22 +337,33 @@ async fn main() -> eyre::Result<()> {
         } else {
             Vec::new()
         };
-        messages.push(
-            ChatCompletionRequestMessageArgs::default()
-                .content(strip_trailing_newline(&message))
-                .build()
-                .context("failed to build chat message")?,
-        );
 
         let api_key = cli.api_key;
+        let client = Client::new().with_api_key(api_key);
+
+        let message = strip_trailing_newline(&message);
+        let embedding = embed(&client, message).await?;
+        embedded_messages.push((
+            ChatCompletionRequestMessageArgs::default()
+                .content(message)
+                .build()
+                .context("failed to build chat message")?,
+            embedding,
+        ));
+
         let model = cli.model;
         let temperature = cli.temperature;
 
-        let client = Client::new().with_api_key(api_key);
         let request = CreateChatCompletionRequestArgs::default()
             .model(model.name())
             .temperature(temperature)
-            .messages(messages.clone())
+            .messages(
+                embedded_messages
+                    .iter()
+                    .cloned()
+                    .map(|(message, _)| message)
+                    .collect::<Vec<_>>(),
+            )
             .build()
             .context("failed to build the completion request")?;
         let mut stream = client
@@ -378,24 +392,42 @@ async fn main() -> eyre::Result<()> {
             writeln!(buffer).context("failed to write new line to buffer")?;
             buffer
         };
-        messages.push(
+
+        let buffer = strip_trailing_newline(&buffer);
+        let embedding = embed(&client, buffer).await?;
+        embedded_messages.push((
             ChatCompletionRequestMessageArgs::default()
-                .content(strip_trailing_newline(&buffer))
+                .content(buffer)
                 .role(Role::Assistant)
                 .build()
                 .context("failed to build chat message")?,
-        );
+            embedding,
+        ));
 
         if true {
             eprintln!("\nWriting contents to {}", path.display());
 
             let file = File::create(path)?;
-            serde_json::to_writer_pretty(file, &messages)
+            serde_json::to_writer_pretty(file, &embedded_messages)
                 .with_context(|| format!("failed to serialize contents to {}", path.display()))?;
         }
     }
 
     Ok(())
+}
+
+#[inline]
+async fn embed(client: &Client, message: &str) -> eyre::Result<Vec<f32>> {
+    let request = CreateEmbeddingRequestArgs::default()
+        .model("text-embedding-ada-002")
+        .input(message)
+        .build()?;
+    let response = client.embeddings().create(request).await?;
+    let data = response.data.into_iter().next();
+    let embedding = data
+        .map(|data| data.embedding)
+        .ok_or_else(|| eyre::eyre!("failed to embed input '{message}'"))?;
+    Ok(embedding)
 }
 
 // https://stackoverflow.com/a/66401342/4039050
