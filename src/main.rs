@@ -416,17 +416,24 @@ async fn main() -> eyre::Result<()> {
     Ok(())
 }
 
+const EMBEDDING_LENGTH: usize = 1536;
+
 #[inline]
-async fn embed(client: &Client, message: &str) -> eyre::Result<Vec<f32>> {
+async fn embed(client: &Client, input: &str) -> eyre::Result<Vec<f32>> {
     let request = CreateEmbeddingRequestArgs::default()
         .model("text-embedding-ada-002")
-        .input(message)
+        .input(input)
         .build()?;
     let response = client.embeddings().create(request).await?;
     let data = response.data.into_iter().next();
     let embedding = data
         .map(|data| data.embedding)
-        .ok_or_else(|| eyre::eyre!("failed to embed input '{message}'"))?;
+        .ok_or_else(|| eyre::eyre!("failed to embed '{input}'"))?;
+    eyre::ensure!(
+        embedding.len() == EMBEDDING_LENGTH,
+        "embedding has incorrect length (expected {EMBEDDING_LENGTH}, got {})",
+        embedding.len()
+    );
     Ok(embedding)
 }
 
