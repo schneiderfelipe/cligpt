@@ -342,13 +342,13 @@ async fn main() -> eyre::Result<()> {
         let client = Client::new().with_api_key(api_key);
 
         let message = strip_trailing_newline(&message);
-        let embedding = embed(&client, message).await?;
+        let message_embedding = embed(&client, message).await?;
         embedded_messages.push((
             ChatCompletionRequestMessageArgs::default()
                 .content(message)
                 .build()
                 .context("failed to build chat message")?,
-            embedding,
+            message_embedding,
         ));
 
         let model = cli.model;
@@ -394,15 +394,26 @@ async fn main() -> eyre::Result<()> {
         };
 
         let buffer = strip_trailing_newline(&buffer);
-        let embedding = embed(&client, buffer).await?;
+        let buffer_embedding = embed(&client, buffer).await?;
         embedded_messages.push((
             ChatCompletionRequestMessageArgs::default()
                 .content(buffer)
                 .role(Role::Assistant)
                 .build()
                 .context("failed to build chat message")?,
-            embedding,
+            buffer_embedding,
         ));
+
+        for (n, (_, e1)) in embedded_messages.iter().enumerate() {
+            for (m, (_, e2)) in embedded_messages.iter().enumerate() {
+                if n >= m {
+                    eprint!("  {:4.2}", cosine_similarity(e1, e2));
+                } else {
+                    eprint!("      ");
+                }
+            }
+            eprintln!();
+        }
 
         if true {
             eprintln!("\nWriting contents to {}", path.display());
