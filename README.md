@@ -20,6 +20,8 @@ to quickly prototype text generation applications
 or for anyone who wants to experiment with the power of the `ChatGPT` API
 from the comfort of their terminal.
 
+**Keep reading in order to learn how to [install](#installation) and [use](#usage) `cligpt`.**
+
 ## Installation
 
 ### Requirements
