@@ -20,8 +20,11 @@ to provide a user-friendly interface for the `ChatGPT` API.
 
 ## Common use cases
 
-- Quickly prototype text generation applications
-- Experiment with the power of the ChatGPT API from the comfort of your terminal.
+- Create personalized and unique text with ease (e.g., for your marketing campaigns or email newsletters).
+- Power your chatbot or virtual assistant with the latest text generation technology.
+- Automate the creation of quality text-based content in minutes (e.g., for your websites or social media platforms).
+- Prototype text generation applications quickly and efficiently with a user-friendly interface.
+- Experiment with the power of the ChatGPT API from the comfort of your terminal and experience the limitless possibilities of text generation.
 
 ## Installation
 
