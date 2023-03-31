@@ -109,6 +109,14 @@ cligpt --temperature 0.9 --model gpt4 'Hello, ChatGPT!'
 In the example above,
 the API key will be read from the environment.
 
+`cligpt` supports receiving prompt both from the standard input and as positional arguments.
+Each prompt piece is concatenated and separated by a single space, with the standard input coming last:
+
+```console
+$ echo "Repeat this message exactly how you read it" | cligpt Hello 'world!'
+Hello world! Repeat this message exactly how you read it.
+```
+
 For more information on available options,
 run `cligpt --help`.
 
