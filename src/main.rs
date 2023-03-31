@@ -404,15 +404,23 @@ async fn main() -> eyre::Result<()> {
             buffer_embedding,
         ));
 
-        for (n, (_, e1)) in embedded_messages.iter().enumerate() {
-            for (m, (_, e2)) in embedded_messages.iter().enumerate() {
-                if n >= m {
-                    eprint!("  {:4.2}", cosine_similarity(e1, e2));
-                } else {
-                    eprint!("      ");
-                }
-            }
-            eprintln!();
+        let mut iter = embedded_messages.iter().enumerate().rev();
+        let last_response = iter.next().unwrap();
+        let last_request = iter.next().unwrap();
+        let most_similar = iter
+            .map(|(n, (c, e))| {
+                (
+                    n,
+                    c,
+                    cosine_similarity(e, &last_request.1 .1)
+                        .max(cosine_similarity(e, &last_response.1 .1)),
+                )
+            })
+            .max_by(|(_, _, x), (_, _, y)| x.partial_cmp(y).unwrap())
+            .unwrap();
+        eprintln!("{most_similar:#?}");
+        if let Role::Assistant = most_similar.1.role {
+            eprintln!("Should get the previous one actually");
         }
 
         if true {
