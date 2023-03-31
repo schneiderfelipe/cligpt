@@ -15,12 +15,13 @@ and `cligpt` will handle the rest.
 and
 [`async-openai`](https://github.com/64bit/async-openai) crates
 to provide a user-friendly interface for the `ChatGPT` API.
-It's perfect for developers who want
-to quickly prototype text generation applications
-or for anyone who wants to experiment with the power of the `ChatGPT` API
-from the comfort of their terminal.
 
 **Keep reading in order to learn how to [install](#installation) and [use](#usage) `cligpt`.**
+
+## Common use cases
+
+- Quickly prototype text generation applications
+- Experiment with the power of the ChatGPT API from the comfort of your terminal.
 
 ## Installation
 
