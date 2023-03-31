@@ -45,7 +45,7 @@ compile the `cligpt` binary,
 and install it in your system.
 Once the installation is complete,
 you can run `cligpt` by typing `cligpt` in your terminal.
-That's it!
+*That's it!*
 
 ### Directly from [GitHub](https://github.com/schneiderfelipe/cligpt)
 
