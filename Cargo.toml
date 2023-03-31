@@ -12,14 +12,14 @@ rust-version = "1.65.0"
 
 [dependencies]
 async-openai = { version = "0.10.1", default-features = false }
-clap = { version = "4.2.0", features = [
+clap = { version = "4.2.1", features = [
   "derive",
   "env",
   "std",
 ], default-features = false }
 color-eyre = { version = "0.6.2", default-features = false }
 
-futures-util = { version = "0.3.27", default-features = false }
+futures-util = { version = "0.3.28", default-features = false }
 serde_json = { version = "1.0.95", default-features = false }
 tokio = { version = "1.27.0", features = [
   "rt-multi-thread",
