@@ -309,6 +309,7 @@ async fn main() -> eyre::Result<()> {
     Ok(())
 }
 
+#[inline]
 async fn handle_chat(cli: Cli) -> eyre::Result<()> {
     let message = {
         let mut message = String::new();
