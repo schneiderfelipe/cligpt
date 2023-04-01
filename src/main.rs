@@ -220,7 +220,7 @@ enum Model {
 
 impl Model {
     #[inline]
-    fn name(self) -> &'static str {
+    const fn name(self) -> &'static str {
         match self {
             Self::Gpt35 => "gpt-3.5-turbo",
             Self::Gpt4 => "gpt-4",
@@ -473,7 +473,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 fn strip_trailing_newline(input: &str) -> &str {
     input
         .strip_suffix("\r\n")
-        .or(input.strip_suffix('\n'))
+        .or_else(|| input.strip_suffix('\n'))
         .unwrap_or(input)
 }
 
