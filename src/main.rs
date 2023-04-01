@@ -149,8 +149,8 @@ use std::{
 
 use async_openai::{
     types::{
-        ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs,
-        CreateEmbeddingRequestArgs, Role,
+        ChatCompletionRequestMessageArgs, ChatCompletionResponseStream,
+        CreateChatCompletionRequestArgs, CreateEmbeddingRequestArgs, Role,
     },
     Client,
 };
@@ -309,16 +309,38 @@ async fn main() -> eyre::Result<()> {
     Ok(())
 }
 
+fn read_message_from_stdin() -> eyre::Result<String> {
+    let mut message = String::new();
+    io::stdin()
+        .lock()
+        .read_to_string(&mut message)
+        .context("failed to read from the standard input")?;
+    Ok(message)
+}
+
+async fn process_chat_response(stream: &mut ChatCompletionResponseStream) -> eyre::Result<String> {
+    let mut stdout = io::stdout().lock();
+    let mut buffer = String::new();
+
+    writeln!(stdout).context("failed to write new line to the standard output")?;
+    while let Some(result) = stream.next().await {
+        let response = result.context("failed to obtain a stream response")?;
+        if let Some(choice) = response.choices.get(0) {
+            if let Some(text) = &choice.delta.content {
+                write!(stdout, "{text}")
+                    .context("failed to write response delta to the standard output")?;
+                write!(buffer, "{text}").context("failed to write response delta to buffer")?;
+            }
+        }
+    }
+    writeln!(stdout).context("failed to write new line to the standard output")?;
+    writeln!(buffer).context("failed to write new line to buffer")?;
+    Ok(buffer)
+}
+
 #[inline]
 async fn handle_chat(cli: Cli) -> eyre::Result<()> {
-    let message = {
-        let mut message = String::new();
-        io::stdin()
-            .lock()
-            .read_to_string(&mut message)
-            .context("failed to read from the standard input")?;
-        message
-    };
+    let message = read_message_from_stdin()?;
 
     let context = cli.context.join(" ");
     let message = match (context.is_empty(), message.is_empty()) {
@@ -374,31 +396,14 @@ async fn handle_chat(cli: Cli) -> eyre::Result<()> {
         )
         .build()
         .context("failed to build the completion request")?;
+
     let mut stream = client
         .chat()
         .create_stream(request)
         .await
         .context("failed to create the completion stream")?;
 
-    let buffer = {
-        let mut stdout = io::stdout().lock();
-        let mut buffer = String::new();
-
-        writeln!(stdout).context("failed to write new line to the standard output")?;
-        while let Some(result) = stream.next().await {
-            let response = result.context("failed to obtain a stream response")?;
-            if let Some(choice) = response.choices.get(0) {
-                if let Some(text) = &choice.delta.content {
-                    write!(stdout, "{text}")
-                        .context("failed to write response delta to the standard output")?;
-                    write!(buffer, "{text}").context("failed to write response delta to buffer")?;
-                }
-            }
-        }
-        writeln!(stdout).context("failed to write new line to the standard output")?;
-        writeln!(buffer).context("failed to write new line to buffer")?;
-        buffer
-    };
+    let buffer = process_chat_response(&mut stream).await?;
 
     let buffer = strip_trailing_newline(&buffer);
     let buffer_embedding = embed(&client, buffer).await?;
