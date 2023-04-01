@@ -479,12 +479,12 @@ fn strip_trailing_newline(input: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use clap::CommandFactory;
-
     use super::*;
 
     #[test]
     fn verify_cli() {
+        use clap::CommandFactory;
+
         Cli::command().debug_assert();
     }
 
@@ -498,8 +498,10 @@ mod tests {
 
     #[test]
     fn cosine_similarity_works() {
-        assert_eq!(cosine_similarity(&[0.0, 1.0], &[0.0, 1.0]), 1.0);
-        assert_eq!(cosine_similarity(&[0.0, 1.0], &[1.0, 0.0]), 0.0);
-        assert_eq!(cosine_similarity(&[0.0, 1.0], &[0.5, 0.5]), 0.707_106_77);
+        use approx::assert_abs_diff_eq;
+
+        assert_abs_diff_eq!(cosine_similarity(&[0.0, 1.0], &[0.0, 1.0]), 1.0);
+        assert_abs_diff_eq!(cosine_similarity(&[0.0, 1.0], &[1.0, 0.0]), 0.0);
+        assert_abs_diff_eq!(cosine_similarity(&[0.0, 1.0], &[0.5, 0.5]), 0.707_106_77);
     }
 }

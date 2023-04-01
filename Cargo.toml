@@ -25,6 +25,9 @@ tokio = { version = "1.27.0", features = [
   "rt-multi-thread",
 ], default-features = false }
 
+[dev-dependencies]
+approx = { version = "0.5.1" }
+
 [features]
 default = [
   "color",
