@@ -18,6 +18,11 @@ to provide a user-friendly interface for the `ChatGPT` API.
 
 **Keep reading in order to learn how to [install](#installation) and [use](#usage) `cligpt`.**
 
+## Available models
+
+- `--model=gpt35` ([ChatGPT](https://openai.com/blog/introducing-chatgpt-and-whisper-apis), [`gpt-3.5-turbo`](https://platform.openai.com/docs/guides/chat), default)
+- `--model=gpt4` ([GPT-4](https://openai.com/product/gpt-4), [`gpt-4`](https://platform.openai.com/docs/guides/chat))
+
 ## Common use cases
 
 - Create personalized and unique text with ease (e.g., for your marketing campaigns or email newsletters).
