@@ -222,8 +222,8 @@ impl Model {
     #[inline]
     fn name(self) -> &'static str {
         match self {
-            Model::Gpt35 => "gpt-3.5-turbo",
-            Model::Gpt4 => "gpt-4",
+            Self::Gpt35 => "gpt-3.5-turbo",
+            Self::Gpt4 => "gpt-4",
         }
     }
 }
@@ -416,10 +416,12 @@ async fn main() -> eyre::Result<()> {
                         .max(cosine_similarity(e, &last_response.1 .1)),
                 )
             })
-            .max_by(|(_, _, x), (_, _, y)| x.partial_cmp(y).unwrap())
-            .unwrap();
+            .max_by(|(_, _, x), (_, _, y)| x.partial_cmp(y).unwrap());
         eprintln!("{most_similar:#?}");
-        if let Role::Assistant = most_similar.1.role {
+        if matches!(
+            most_similar.map(|(_, m, _)| &m.role),
+            Some(&Role::Assistant)
+        ) {
             eprintln!("Should get the previous one actually");
         }
 
