@@ -303,135 +303,140 @@ async fn main() -> eyre::Result<()> {
             } => todo!(),
         }
     } else {
-        let message = {
-            let mut message = String::new();
-            io::stdin()
-                .lock()
-                .read_to_string(&mut message)
-                .context("failed to read from the standard input")?;
-            message
-        };
+        handle_chat(cli).await?;
+    }
 
-        let context = cli.context.join(" ");
-        let message = match (context.is_empty(), message.is_empty()) {
-            (false, false) => [context, message].join(" "),
-            (false, true) => context,
-            (true, false) => message,
-            (true, true) => eyre::bail!("cannot use empty string as chat message"),
-        };
-        eyre::ensure!(
-            !message.trim().is_empty(),
-            "cannot use all-whitespace string as chat message"
-        );
+    Ok(())
+}
 
-        let path = Path::new("cligpt.chat.json");
-        let mut embedded_messages = if path.try_exists()? {
-            eprintln!("Reading contents from {}", path.display());
+async fn handle_chat(cli: Cli) -> eyre::Result<()> {
+    let message = {
+        let mut message = String::new();
+        io::stdin()
+            .lock()
+            .read_to_string(&mut message)
+            .context("failed to read from the standard input")?;
+        message
+    };
 
-            let contents = fs::read_to_string(path)
-                .with_context(|| format!("failed to read from {}", path.display()))?;
+    let context = cli.context.join(" ");
+    let message = match (context.is_empty(), message.is_empty()) {
+        (false, false) => [context, message].join(" "),
+        (false, true) => context,
+        (true, false) => message,
+        (true, true) => eyre::bail!("cannot use empty string as chat message"),
+    };
+    eyre::ensure!(
+        !message.trim().is_empty(),
+        "cannot use all-whitespace string as chat message"
+    );
 
-            // https://github.com/serde-rs/json/issues/160#issuecomment-253446892
-            serde_json::from_str(&contents)
-                .with_context(|| format!("failed to deserialize contents of {}", path.display()))?
-        } else {
-            Vec::new()
-        };
+    let path = Path::new("cligpt.chat.json");
+    let mut embedded_messages = if path.try_exists()? {
+        eprintln!("Reading contents from {}", path.display());
 
-        let api_key = cli.api_key;
-        let client = Client::new().with_api_key(api_key);
+        let contents = fs::read_to_string(path)
+            .with_context(|| format!("failed to read from {}", path.display()))?;
 
-        let message = strip_trailing_newline(&message);
-        let message_embedding = embed(&client, message).await?;
-        embedded_messages.push((
-            ChatCompletionRequestMessageArgs::default()
-                .content(message)
-                .build()
-                .context("failed to build chat message")?,
-            message_embedding,
-        ));
+        // https://github.com/serde-rs/json/issues/160#issuecomment-253446892
+        serde_json::from_str(&contents)
+            .with_context(|| format!("failed to deserialize contents of {}", path.display()))?
+    } else {
+        Vec::new()
+    };
 
-        let model = cli.model;
-        let temperature = cli.temperature;
+    let api_key = cli.api_key;
+    let client = Client::new().with_api_key(api_key);
 
-        let request = CreateChatCompletionRequestArgs::default()
-            .model(model.name())
-            .temperature(temperature)
-            .messages(
-                embedded_messages
-                    .iter()
-                    .cloned()
-                    .map(|(message, _)| message)
-                    .collect::<Vec<_>>(),
-            )
+    let message = strip_trailing_newline(&message);
+    let message_embedding = embed(&client, message).await?;
+    embedded_messages.push((
+        ChatCompletionRequestMessageArgs::default()
+            .content(message)
             .build()
-            .context("failed to build the completion request")?;
-        let mut stream = client
-            .chat()
-            .create_stream(request)
-            .await
-            .context("failed to create the completion stream")?;
+            .context("failed to build chat message")?,
+        message_embedding,
+    ));
 
-        let buffer = {
-            let mut stdout = io::stdout().lock();
-            let mut buffer = String::new();
+    let model = cli.model;
+    let temperature = cli.temperature;
 
-            writeln!(stdout).context("failed to write new line to the standard output")?;
-            while let Some(result) = stream.next().await {
-                let response = result.context("failed to obtain a stream response")?;
-                if let Some(choice) = response.choices.get(0) {
-                    if let Some(text) = &choice.delta.content {
-                        write!(stdout, "{text}")
-                            .context("failed to write response delta to the standard output")?;
-                        write!(buffer, "{text}")
-                            .context("failed to write response delta to buffer")?;
-                    }
+    let request = CreateChatCompletionRequestArgs::default()
+        .model(model.name())
+        .temperature(temperature)
+        .messages(
+            embedded_messages
+                .iter()
+                .cloned()
+                .map(|(message, _)| message)
+                .collect::<Vec<_>>(),
+        )
+        .build()
+        .context("failed to build the completion request")?;
+    let mut stream = client
+        .chat()
+        .create_stream(request)
+        .await
+        .context("failed to create the completion stream")?;
+
+    let buffer = {
+        let mut stdout = io::stdout().lock();
+        let mut buffer = String::new();
+
+        writeln!(stdout).context("failed to write new line to the standard output")?;
+        while let Some(result) = stream.next().await {
+            let response = result.context("failed to obtain a stream response")?;
+            if let Some(choice) = response.choices.get(0) {
+                if let Some(text) = &choice.delta.content {
+                    write!(stdout, "{text}")
+                        .context("failed to write response delta to the standard output")?;
+                    write!(buffer, "{text}").context("failed to write response delta to buffer")?;
                 }
             }
-            writeln!(stdout).context("failed to write new line to the standard output")?;
-            writeln!(buffer).context("failed to write new line to buffer")?;
-            buffer
-        };
-
-        let buffer = strip_trailing_newline(&buffer);
-        let buffer_embedding = embed(&client, buffer).await?;
-        embedded_messages.push((
-            ChatCompletionRequestMessageArgs::default()
-                .content(buffer)
-                .role(Role::Assistant)
-                .build()
-                .context("failed to build chat message")?,
-            buffer_embedding,
-        ));
-
-        let mut iter = embedded_messages.iter().enumerate().rev();
-        let last_response = iter.next().unwrap();
-        let last_request = iter.next().unwrap();
-        let most_similar = iter
-            .map(|(n, (c, e))| {
-                (
-                    n,
-                    c,
-                    cosine_similarity(e, &last_request.1 .1)
-                        .max(cosine_similarity(e, &last_response.1 .1)),
-                )
-            })
-            .max_by(|(_, _, x), (_, _, y)| x.partial_cmp(y).unwrap());
-        eprintln!("{most_similar:#?}");
-        if matches!(
-            most_similar.map(|(_, m, _)| &m.role),
-            Some(&Role::Assistant)
-        ) {
-            eprintln!("Should get the previous one actually");
         }
+        writeln!(stdout).context("failed to write new line to the standard output")?;
+        writeln!(buffer).context("failed to write new line to buffer")?;
+        buffer
+    };
 
-        if true {
-            eprintln!("\nWriting contents to {}", path.display());
+    let buffer = strip_trailing_newline(&buffer);
+    let buffer_embedding = embed(&client, buffer).await?;
+    embedded_messages.push((
+        ChatCompletionRequestMessageArgs::default()
+            .content(buffer)
+            .role(Role::Assistant)
+            .build()
+            .context("failed to build chat message")?,
+        buffer_embedding,
+    ));
 
-            let file = File::create(path)?;
-            serde_json::to_writer(file, &embedded_messages)
-                .with_context(|| format!("failed to serialize contents to {}", path.display()))?;
-        }
+    let mut iter = embedded_messages.iter().enumerate().rev();
+    let last_response = iter.next().unwrap();
+    let last_request = iter.next().unwrap();
+    let most_similar = iter
+        .map(|(n, (c, e))| {
+            (
+                n,
+                c,
+                cosine_similarity(e, &last_request.1 .1)
+                    .max(cosine_similarity(e, &last_response.1 .1)),
+            )
+        })
+        .max_by(|(_, _, x), (_, _, y)| x.partial_cmp(y).unwrap());
+    eprintln!("{most_similar:#?}");
+    if matches!(
+        most_similar.map(|(_, m, _)| &m.role),
+        Some(&Role::Assistant)
+    ) {
+        eprintln!("Should get the previous one actually");
+    }
+
+    if true {
+        eprintln!("\nWriting contents to {}", path.display());
+
+        let file = File::create(path)?;
+        serde_json::to_writer(file, &embedded_messages)
+            .with_context(|| format!("failed to serialize contents to {}", path.display()))?;
     }
 
     Ok(())
