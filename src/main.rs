@@ -183,18 +183,23 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Create a new chat.
-    NewChat,
     /// List all chats.
     ListChats,
-    /// Delete a chat.
-    DeleteChat {
-        /// Name or ID of the chat to delete.
+    /// Create a new chat.
+    NewChat,
+    /// Show a chat.
+    ShowChat {
+        /// Name or ID of the chat to show.
         chat_name: String,
     },
     /// Switch to a different chat.
     SwitchChat {
         /// Name or ID of the chat to switch to.
+        chat_name: String,
+    },
+    /// Delete a chat.
+    DeleteChat {
+        /// Name or ID of the chat to delete.
         chat_name: String,
     },
     /// Rename a chat.
@@ -293,10 +298,11 @@ async fn main() -> eyre::Result<()> {
     let cli = Cli::parse();
     if let Some(command) = cli.command {
         match command {
-            Command::NewChat => todo!(),
             Command::ListChats => todo!(),
-            Command::DeleteChat { chat_name: _ } => todo!(),
+            Command::NewChat => todo!(),
+            Command::ShowChat { chat_name: _ } => todo!(),
             Command::SwitchChat { chat_name: _ } => todo!(),
+            Command::DeleteChat { chat_name: _ } => todo!(),
             Command::RenameChat {
                 chat_name: _,
                 new_name: _,
