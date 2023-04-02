@@ -139,23 +139,26 @@
 //!
 //! `cligpt` is released under the [MIT License](LICENSE).
 
-use std::{
-    fmt::Write as _,
-    fs::{self, File},
-    io::{self, Read, Write},
-    ops::RangeInclusive,
-    path::Path,
-};
+use std::fmt::Write as _;
+use std::fs::File;
+use std::fs::{self};
+use std::io::Read;
+use std::io::Write;
+use std::io::{self};
+use std::ops::RangeInclusive;
+use std::path::Path;
 
-use async_openai::{
-    types::{
-        ChatCompletionRequestMessageArgs, ChatCompletionResponseStream,
-        CreateChatCompletionRequestArgs, CreateEmbeddingRequestArgs, Role,
-    },
-    Client,
-};
-use clap::{Parser, Subcommand, ValueEnum};
-use color_eyre::eyre::{self, Context};
+use async_openai::types::ChatCompletionRequestMessageArgs;
+use async_openai::types::ChatCompletionResponseStream;
+use async_openai::types::CreateChatCompletionRequestArgs;
+use async_openai::types::CreateEmbeddingRequestArgs;
+use async_openai::types::Role;
+use async_openai::Client;
+use clap::Parser;
+use clap::Subcommand;
+use clap::ValueEnum;
+use color_eyre::eyre::Context;
+use color_eyre::eyre::{self};
 use futures_util::StreamExt;
 
 /// A command-line interface to talk to `ChatGPT`.
@@ -211,7 +214,8 @@ enum Command {
     },
 }
 
-/// Different language models that can be used for natural language processing tasks.
+/// Different language models that can be used for natural language processing
+/// tasks.
 #[derive(Clone, Copy, Debug, Default, ValueEnum)]
 enum Model {
     /// A highly capable GPT-3.5 model optimized for chat at a reduced cost.
