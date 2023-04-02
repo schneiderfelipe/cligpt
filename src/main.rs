@@ -422,11 +422,11 @@ async fn handle_chat(cli: Cli) -> eyre::Result<()> {
         buffer_embedding,
     ));
 
-    let mut iter = embedded_messages.iter().enumerate().rev();
-    let last_response = iter.next().unwrap();
-    let last_request = iter.next().unwrap();
-    let most_similar = iter
-        .map(|(n, (c, e))| {
+    let most_similar = {
+        let mut iter = embedded_messages.iter().enumerate().rev();
+        let last_response = iter.next().unwrap();
+        let last_request = iter.next().unwrap();
+        iter.map(|(n, (c, e))| {
             (
                 n,
                 c,
@@ -434,14 +434,24 @@ async fn handle_chat(cli: Cli) -> eyre::Result<()> {
                     .max(cosine_similarity(e, &last_response.1 .1)),
             )
         })
-        .max_by(|(_, _, x), (_, _, y)| x.partial_cmp(y).unwrap());
+        .max_by(|(_, _, x), (_, _, y)| x.partial_cmp(y).unwrap())
+    };
     eprintln!("{most_similar:#?}");
-    if matches!(
-        most_similar.map(|(_, m, _)| &m.role),
-        Some(&Role::Assistant)
-    ) {
-        eprintln!("Should get the previous one actually");
-    }
+    let least_similar = {
+        let mut iter = embedded_messages.iter().enumerate().rev();
+        let last_response = iter.next().unwrap();
+        let last_request = iter.next().unwrap();
+        iter.map(|(n, (c, e))| {
+            (
+                n,
+                c,
+                cosine_similarity(e, &last_request.1 .1)
+                    .max(cosine_similarity(e, &last_response.1 .1)),
+            )
+        })
+        .min_by(|(_, _, x), (_, _, y)| x.partial_cmp(y).unwrap())
+    };
+    eprintln!("{least_similar:#?}");
 
     if true {
         eprintln!("\nWriting contents to {}", path.display());
