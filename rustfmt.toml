@@ -6,14 +6,15 @@ group_imports = "StdExternalCrate"
 
 condense_wildcard_suffixes = true
 force_multiline_blocks = true
-format_code_in_doc_comments = true
 format_macro_matchers = true
 format_strings = true
-normalize_comments = true
 normalize_doc_attributes = true
 overflow_delimited_expr = true
 reorder_impl_items = true
 skip_children = true
 use_field_init_shorthand = true
 use_try_shorthand = true
+
+format_code_in_doc_comments = true
+normalize_comments = true
 wrap_comments = true
