@@ -84,7 +84,7 @@
 //! Here's an example usage:
 //!
 //! ```bash
-//! cligpt --api-key YOUR_API_KEY chat 'Hello, ChatGPT!'
+//! cligpt --api-key YOUR_API_KEY 'Hello, ChatGPT!'
 //! ```
 //!
 //! This will send the message `'Hello, ChatGPT!'` to the `ChatGPT` API using
@@ -98,7 +98,7 @@
 //! you can set the temperature to 0.9 and use GPT-4:
 //!
 //! ```bash
-//! cligpt --temperature 0.9 --model gpt4 chat 'Hello, ChatGPT!'
+//! cligpt --temperature 0.9 --model gpt4 'Hello, ChatGPT!'
 //! ```
 //!
 //! In the example above,
