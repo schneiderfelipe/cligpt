@@ -320,6 +320,7 @@ async fn main() -> eyre::Result<()> {
     Ok(())
 }
 
+#[inline]
 fn read_message_from_stdin() -> eyre::Result<String> {
     let mut message = String::new();
     io::stdin()
@@ -329,6 +330,7 @@ fn read_message_from_stdin() -> eyre::Result<String> {
     Ok(message)
 }
 
+#[inline]
 async fn process_chat_response(stream: &mut ChatCompletionResponseStream) -> eyre::Result<String> {
     let mut stdout = io::stdout().lock();
     let mut buffer = String::new();
@@ -349,44 +351,6 @@ async fn process_chat_response(stream: &mut ChatCompletionResponseStream) -> eyr
     Ok(buffer)
 }
 
-const PATH: &str = "cligpt.chat.json";
-
-#[inline]
-fn read_chat() -> eyre::Result<Vec<(Message, Embedding)>> {
-    let embedded_messages = if Path::new(PATH).try_exists()? {
-        eprintln!("Reading contents from {}", Path::new(PATH).display());
-
-        let contents = fs::read_to_string(PATH)
-            .with_context(|| format!("failed to read from {}", Path::new(PATH).display()))?;
-
-        // https://github.com/serde-rs/json/issues/160#issuecomment-253446892
-        serde_json::from_str(&contents).with_context(|| {
-            format!(
-                "failed to deserialize contents of {}",
-                Path::new(PATH).display()
-            )
-        })?
-    } else {
-        Vec::new()
-    };
-    Ok(embedded_messages)
-}
-
-#[inline]
-fn write_chat(embedded_messages: &[(Message, Embedding)]) -> eyre::Result<()> {
-    eprintln!("\nWriting contents to {}", Path::new(PATH).display());
-
-    let file = File::create(PATH)?;
-    serde_json::to_writer(file, embedded_messages).with_context(|| {
-        format!(
-            "failed to serialize contents to {}",
-            Path::new(PATH).display()
-        )
-    })?;
-
-    Ok(())
-}
-
 #[inline]
 async fn handle_chat(cli: Cli) -> eyre::Result<()> {
     let message = read_message_from_stdin()?;
@@ -403,7 +367,7 @@ async fn handle_chat(cli: Cli) -> eyre::Result<()> {
         "cannot use all-whitespace string as chat message"
     );
 
-    let mut embedded_messages = read_chat()?;
+    let mut embedded_messages = read_chat_from_path()?;
 
     let api_key = cli.api_key;
     let client = Client::new().with_api_key(api_key);
@@ -484,7 +448,45 @@ async fn handle_chat(cli: Cli) -> eyre::Result<()> {
     };
     eprintln!("{least_similar:#?}");
 
-    write_chat(&embedded_messages)?;
+    write_chat_to_path(&embedded_messages)?;
+
+    Ok(())
+}
+
+const PATH: &str = "cligpt.chat.json";
+
+#[inline]
+fn read_chat_from_path() -> eyre::Result<Vec<(Message, Embedding)>> {
+    let embedded_messages = if Path::new(PATH).try_exists()? {
+        eprintln!("Reading contents from {}", Path::new(PATH).display());
+
+        let contents = fs::read_to_string(PATH)
+            .with_context(|| format!("failed to read from {}", Path::new(PATH).display()))?;
+
+        // https://github.com/serde-rs/json/issues/160#issuecomment-253446892
+        serde_json::from_str(&contents).with_context(|| {
+            format!(
+                "failed to deserialize contents of {}",
+                Path::new(PATH).display()
+            )
+        })?
+    } else {
+        Vec::new()
+    };
+    Ok(embedded_messages)
+}
+
+#[inline]
+fn write_chat_to_path(embedded_messages: &[(Message, Embedding)]) -> eyre::Result<()> {
+    eprintln!("\nWriting contents to {}", Path::new(PATH).display());
+
+    let file = File::create(PATH)?;
+    serde_json::to_writer(file, embedded_messages).with_context(|| {
+        format!(
+            "failed to serialize contents to {}",
+            Path::new(PATH).display()
+        )
+    })?;
 
     Ok(())
 }
