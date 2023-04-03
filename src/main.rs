@@ -286,16 +286,18 @@ async fn main() -> eyre::Result<()> {
             eyre::bail!("failed to obtain project directory");
         };
         let cache_dir = proj_dirs.cache_dir();
-        fs::create_dir_all(cache_dir)?;
+        fs::create_dir_all(cache_dir).context("failed to create the cache directory")?;
         cache_dir.join("chat.json")
     };
 
     if let Some(command) = cli.command {
         match command {
-            Command::Show => handle_show(path)?,
+            Command::Show => handle_show(path).context("failed to handle the show command")?,
         }
     } else {
-        handle_chat(cli.model, cli.temperature, cli.api_key, path).await?;
+        handle_chat(cli.model, cli.temperature, cli.api_key, path)
+            .await
+            .context("failed to handle the chat command")?;
     }
 
     Ok(())
@@ -324,7 +326,9 @@ async fn process_chat_response(stream: &mut ChatCompletionResponseStream) -> eyr
                 write!(stdout, "{text}")
                     .context("failed to write response delta to the standard output")?;
                 write!(buffer, "{text}").context("failed to write response delta to buffer")?;
-                stdout.flush()?
+                stdout
+                    .flush()
+                    .context("failed to flush the standard output")?
             }
         }
     }
@@ -335,18 +339,22 @@ async fn process_chat_response(stream: &mut ChatCompletionResponseStream) -> eyr
 
 #[inline]
 fn handle_show(path: impl AsRef<Path>) -> eyre::Result<()> {
-    let chat = read_chat_from_path(path)?;
+    let chat = read_chat_from_path(path).context("failed to read the chat history")?;
 
     let mut stdout = io::stdout().lock();
     for (message, _) in chat {
         if let Some(name) = message.name {
-            writeln!(stdout, "{name}:")?;
+            writeln!(stdout, "{name}:").context("failed to write name to the standard output")?;
         } else {
-            writeln!(stdout, "{name}:", name = message.role)?;
+            writeln!(stdout, "{name}:", name = message.role)
+                .context("failed to write role to the standard output")?;
         }
-        writeln!(stdout, "{}", message.content)?;
-        writeln!(stdout)?;
-        stdout.flush()?;
+        writeln!(stdout, "{}", message.content)
+            .context("failed to write content to the standard output")?;
+        writeln!(stdout).context("failed to write a new line to the standard output")?;
+        stdout
+            .flush()
+            .context("failed to flush the standard output")?;
     }
 
     Ok(())
@@ -359,18 +367,21 @@ async fn handle_chat(
     api_key: impl Into<String>,
     path: impl AsRef<Path>,
 ) -> eyre::Result<()> {
-    let message = read_message_from_stdin()?;
+    let message =
+        read_message_from_stdin().context("failed to read message from the standard input")?;
     eyre::ensure!(
         !message.trim().is_empty(),
         "cannot use all-whitespace string as chat message"
     );
 
-    let mut chat = read_chat_from_path(&path)?;
+    let mut chat = read_chat_from_path(&path).context("failed to read chat history")?;
 
     let client = Client::new().with_api_key(api_key);
 
     let message = strip_trailing_newline(&message);
-    let message_embedding = embed(&client, message).await?;
+    let message_embedding = embed(&client, message)
+        .await
+        .context("failed to embed message")?;
     chat.push((
         ChatCompletionRequestMessageArgs::default()
             .content(message)
@@ -397,10 +408,14 @@ async fn handle_chat(
         .await
         .context("failed to create the completion stream")?;
 
-    let buffer = process_chat_response(&mut stream).await?;
+    let buffer = process_chat_response(&mut stream)
+        .await
+        .context("failed to process chat response")?;
 
     let buffer = strip_trailing_newline(&buffer);
-    let buffer_embedding = embed(&client, buffer).await?;
+    let buffer_embedding = embed(&client, buffer)
+        .await
+        .context("failed to embed response")?;
     chat.push((
         ChatCompletionRequestMessageArgs::default()
             .content(buffer)
@@ -410,9 +425,9 @@ async fn handle_chat(
         buffer_embedding,
     ));
 
-    let (current_chat, _outdated_chat) = split_chat(chat)?;
+    let (current_chat, _outdated_chat) = split_chat(chat).context("failed to split chat")?;
 
-    write_chat_to_path(&current_chat, path)?;
+    write_chat_to_path(&current_chat, path).context("failed to save chat history")?;
 
     Ok(())
 }
@@ -421,7 +436,10 @@ async fn handle_chat(
 fn read_chat_from_path(path: impl AsRef<Path>) -> eyre::Result<Vec<EmbeddedMessage>> {
     let path = path.as_ref();
 
-    let chat = if path.try_exists()? {
+    let chat = if path
+        .try_exists()
+        .context("failed to check if chat history file exists")?
+    {
         let contents = fs::read_to_string(path)
             .with_context(|| format!("failed to read from {}", path.display()))?;
 
@@ -438,7 +456,7 @@ fn read_chat_from_path(path: impl AsRef<Path>) -> eyre::Result<Vec<EmbeddedMessa
 fn write_chat_to_path(chat: &[EmbeddedMessage], path: impl AsRef<Path>) -> eyre::Result<()> {
     let path = path.as_ref();
 
-    let file = fs::File::create(path)?;
+    let file = fs::File::create(path).context("failed to create chat history file")?;
     serde_json::to_writer(file, chat)
         .with_context(|| format!("failed to serialize contents to {}", path.display()))?;
 
@@ -511,8 +529,13 @@ async fn embed(client: &Client, input: &str) -> eyre::Result<Embedding> {
     let request = CreateEmbeddingRequestArgs::default()
         .model("text-embedding-ada-002")
         .input(input)
-        .build()?;
-    let response = client.embeddings().create(request).await?;
+        .build()
+        .context("failed to create embedding request")?;
+    let response = client
+        .embeddings()
+        .create(request)
+        .await
+        .context("failed to obtain embedding response")?;
     let data = response.data.into_iter().next();
     let embedding = data
         .map(|data| data.embedding)
