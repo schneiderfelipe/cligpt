@@ -148,7 +148,8 @@ use std::io::Write;
 use std::ops::RangeInclusive;
 use std::path::Path;
 
-use async_openai::types::ChatCompletionRequestMessageArgs;
+use async_openai::types::ChatCompletionRequestMessage as Message;
+use async_openai::types::ChatCompletionRequestMessageArgs as MessageArgs;
 use async_openai::types::ChatCompletionResponseStream;
 use async_openai::types::CreateChatCompletionRequestArgs;
 use async_openai::types::CreateEmbeddingRequestArgs;
@@ -348,6 +349,44 @@ async fn process_chat_response(stream: &mut ChatCompletionResponseStream) -> eyr
     Ok(buffer)
 }
 
+const PATH: &str = "cligpt.chat.json";
+
+#[inline]
+fn read_chat() -> eyre::Result<Vec<(Message, Embedding)>> {
+    let embedded_messages = if Path::new(PATH).try_exists()? {
+        eprintln!("Reading contents from {}", Path::new(PATH).display());
+
+        let contents = fs::read_to_string(PATH)
+            .with_context(|| format!("failed to read from {}", Path::new(PATH).display()))?;
+
+        // https://github.com/serde-rs/json/issues/160#issuecomment-253446892
+        serde_json::from_str(&contents).with_context(|| {
+            format!(
+                "failed to deserialize contents of {}",
+                Path::new(PATH).display()
+            )
+        })?
+    } else {
+        Vec::new()
+    };
+    Ok(embedded_messages)
+}
+
+#[inline]
+fn write_chat(embedded_messages: &[(Message, Embedding)]) -> eyre::Result<()> {
+    eprintln!("\nWriting contents to {}", Path::new(PATH).display());
+
+    let file = File::create(PATH)?;
+    serde_json::to_writer(file, embedded_messages).with_context(|| {
+        format!(
+            "failed to serialize contents to {}",
+            Path::new(PATH).display()
+        )
+    })?;
+
+    Ok(())
+}
+
 #[inline]
 async fn handle_chat(cli: Cli) -> eyre::Result<()> {
     let message = read_message_from_stdin()?;
@@ -364,19 +403,7 @@ async fn handle_chat(cli: Cli) -> eyre::Result<()> {
         "cannot use all-whitespace string as chat message"
     );
 
-    let path = Path::new("cligpt.chat.json");
-    let mut embedded_messages = if path.try_exists()? {
-        eprintln!("Reading contents from {}", path.display());
-
-        let contents = fs::read_to_string(path)
-            .with_context(|| format!("failed to read from {}", path.display()))?;
-
-        // https://github.com/serde-rs/json/issues/160#issuecomment-253446892
-        serde_json::from_str(&contents)
-            .with_context(|| format!("failed to deserialize contents of {}", path.display()))?
-    } else {
-        Vec::new()
-    };
+    let mut embedded_messages = read_chat()?;
 
     let api_key = cli.api_key;
     let client = Client::new().with_api_key(api_key);
@@ -384,7 +411,7 @@ async fn handle_chat(cli: Cli) -> eyre::Result<()> {
     let message = strip_trailing_newline(&message);
     let message_embedding = embed(&client, message).await?;
     embedded_messages.push((
-        ChatCompletionRequestMessageArgs::default()
+        MessageArgs::default()
             .content(message)
             .build()
             .context("failed to build chat message")?,
@@ -418,7 +445,7 @@ async fn handle_chat(cli: Cli) -> eyre::Result<()> {
     let buffer = strip_trailing_newline(&buffer);
     let buffer_embedding = embed(&client, buffer).await?;
     embedded_messages.push((
-        ChatCompletionRequestMessageArgs::default()
+        MessageArgs::default()
             .content(buffer)
             .role(Role::Assistant)
             .build()
@@ -457,21 +484,17 @@ async fn handle_chat(cli: Cli) -> eyre::Result<()> {
     };
     eprintln!("{least_similar:#?}");
 
-    if true {
-        eprintln!("\nWriting contents to {}", path.display());
-
-        let file = File::create(path)?;
-        serde_json::to_writer(file, &embedded_messages)
-            .with_context(|| format!("failed to serialize contents to {}", path.display()))?;
-    }
+    write_chat(&embedded_messages)?;
 
     Ok(())
 }
 
+type Embedding = Vec<f32>;
+
 const EMBEDDING_LENGTH: usize = 1536;
 
 #[inline]
-async fn embed(client: &Client, input: &str) -> eyre::Result<Vec<f32>> {
+async fn embed(client: &Client, input: &str) -> eyre::Result<Embedding> {
     let request = CreateEmbeddingRequestArgs::default()
         .model("text-embedding-ada-002")
         .input(input)
