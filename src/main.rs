@@ -344,14 +344,15 @@ async fn process_chat_response(stream: &mut ChatCompletionResponseStream) -> eyr
 fn handle_show(path: impl AsRef<Path>) -> eyre::Result<()> {
     let chat = read_chat_from_path(path)?;
 
+    let mut stdout = io::stdout().lock();
     for (message, _) in chat {
         if let Some(name) = message.name {
-            eprintln!("{name}:");
+            writeln!(stdout, "{name}:")?;
         } else {
-            eprintln!("{name}:", name = message.role);
+            writeln!(stdout, "{name}:", name = message.role)?;
         }
-        eprintln!("{}", message.content);
-        eprintln!();
+        writeln!(stdout, "{}", message.content)?;
+        writeln!(stdout)?;
     }
 
     Ok(())
@@ -436,8 +437,6 @@ fn read_chat_from_path(path: impl AsRef<Path>) -> eyre::Result<Vec<EmbeddedMessa
     let path = path.as_ref();
 
     let chat = if path.try_exists()? {
-        eprintln!("Reading contents from {}", path.display());
-
         let contents = fs::read_to_string(path)
             .with_context(|| format!("failed to read from {}", path.display()))?;
 
@@ -453,8 +452,6 @@ fn read_chat_from_path(path: impl AsRef<Path>) -> eyre::Result<Vec<EmbeddedMessa
 #[inline]
 fn write_chat_to_path(chat: &[EmbeddedMessage], path: impl AsRef<Path>) -> eyre::Result<()> {
     let path = path.as_ref();
-
-    eprintln!("\nWriting contents to {}", path.display());
 
     let file = fs::File::create(path)?;
     serde_json::to_writer(file, chat)
