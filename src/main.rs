@@ -141,7 +141,6 @@
 
 use std::fmt::Write as _;
 use std::fs;
-use std::fs::File;
 use std::io;
 use std::io::Read;
 use std::io::Write;
@@ -160,13 +159,13 @@ use clap::Subcommand;
 use clap::ValueEnum;
 use color_eyre::eyre;
 use color_eyre::eyre::Context;
+use directories::ProjectDirs;
 use futures_util::StreamExt;
 
 const API_KEY_RANGE: RangeInclusive<usize> = 40..=50;
 const TEMPERATURE_RANGE: RangeInclusive<f32> = 0.0..=1.0;
 
 const EMBEDDING_LENGTH: usize = 1536;
-const PATH: &str = "cligpt.chat.json"; // TODO: use a user directory to store
 
 type Embedding = Vec<f32>;
 type EmbeddedMessage = (ChatCompletionRequestMessage, Embedding);
@@ -287,26 +286,24 @@ async fn main() -> eyre::Result<()> {
     color_eyre::install().context("failed to install error report handler")?;
 
     let cli = Cli::parse();
+
+    let path = {
+        let Some(proj_dirs) = ProjectDirs::from("com", "schneiderfelipe", "cligpt") else {
+            eyre::bail!("failed to obtain project directory");
+        };
+        let cache_dir = proj_dirs.cache_dir();
+        fs::create_dir_all(cache_dir)?;
+        cache_dir.join("chat.json")
+    };
+
     match cli.command {
         Command::Chat {
             context,
             model,
             temperature,
             api_key,
-        } => handle_chat(context, model, temperature, api_key).await?,
-        Command::Show => {
-            let chat = read_chat_from_path()?;
-
-            for (message, _) in chat {
-                if let Some(name) = message.name {
-                    eprintln!("{name}:");
-                } else {
-                    eprintln!("{name}:", name = message.role);
-                }
-                eprintln!("{}", message.content);
-                eprintln!();
-            }
-        }
+        } => handle_chat(&context, model, temperature, &api_key, path).await?,
+        Command::Show => handle_show(path)?,
     }
 
     Ok(())
@@ -344,11 +341,29 @@ async fn process_chat_response(stream: &mut ChatCompletionResponseStream) -> eyr
 }
 
 #[inline]
+fn handle_show(path: impl AsRef<Path>) -> eyre::Result<()> {
+    let chat = read_chat_from_path(path)?;
+
+    for (message, _) in chat {
+        if let Some(name) = message.name {
+            eprintln!("{name}:");
+        } else {
+            eprintln!("{name}:", name = message.role);
+        }
+        eprintln!("{}", message.content);
+        eprintln!();
+    }
+
+    Ok(())
+}
+
+#[inline]
 async fn handle_chat(
-    context: Vec<String>,
+    context: &[String],
     model: Model,
     temperature: f32,
-    api_key: String,
+    api_key: impl Into<String>,
+    path: impl AsRef<Path>,
 ) -> eyre::Result<()> {
     let message = read_message_from_stdin()?;
 
@@ -364,7 +379,7 @@ async fn handle_chat(
         "cannot use all-whitespace string as chat message"
     );
 
-    let mut chat = read_chat_from_path()?;
+    let mut chat = read_chat_from_path(&path)?;
 
     let client = Client::new().with_api_key(api_key);
 
@@ -410,28 +425,25 @@ async fn handle_chat(
     ));
 
     let (current_chat, _outdated_chat) = split_chat(chat)?;
-    // TODO: summarize outdated and prepend to current
 
-    write_chat_to_path(&current_chat)?;
+    write_chat_to_path(&current_chat, path)?;
 
     Ok(())
 }
 
 #[inline]
-fn read_chat_from_path() -> eyre::Result<Vec<EmbeddedMessage>> {
-    let chat = if Path::new(PATH).try_exists()? {
-        eprintln!("Reading contents from {}", Path::new(PATH).display());
+fn read_chat_from_path(path: impl AsRef<Path>) -> eyre::Result<Vec<EmbeddedMessage>> {
+    let path = path.as_ref();
 
-        let contents = fs::read_to_string(PATH)
-            .with_context(|| format!("failed to read from {}", Path::new(PATH).display()))?;
+    let chat = if path.try_exists()? {
+        eprintln!("Reading contents from {}", path.display());
+
+        let contents = fs::read_to_string(path)
+            .with_context(|| format!("failed to read from {}", path.display()))?;
 
         // https://github.com/serde-rs/json/issues/160#issuecomment-253446892
-        serde_json::from_str(&contents).with_context(|| {
-            format!(
-                "failed to deserialize contents of {}",
-                Path::new(PATH).display()
-            )
-        })?
+        serde_json::from_str(&contents)
+            .with_context(|| format!("failed to deserialize contents of {}", path.display()))?
     } else {
         Vec::new()
     };
@@ -439,16 +451,14 @@ fn read_chat_from_path() -> eyre::Result<Vec<EmbeddedMessage>> {
 }
 
 #[inline]
-fn write_chat_to_path(chat: &[EmbeddedMessage]) -> eyre::Result<()> {
-    eprintln!("\nWriting contents to {}", Path::new(PATH).display());
+fn write_chat_to_path(chat: &[EmbeddedMessage], path: impl AsRef<Path>) -> eyre::Result<()> {
+    let path = path.as_ref();
 
-    let file = File::create(PATH)?;
-    serde_json::to_writer(file, chat).with_context(|| {
-        format!(
-            "failed to serialize contents to {}",
-            Path::new(PATH).display()
-        )
-    })?;
+    eprintln!("\nWriting contents to {}", path.display());
+
+    let file = fs::File::create(path)?;
+    serde_json::to_writer(file, chat)
+        .with_context(|| format!("failed to serialize contents to {}", path.display()))?;
 
     Ok(())
 }
