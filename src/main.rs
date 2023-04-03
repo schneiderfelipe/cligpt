@@ -184,9 +184,6 @@ enum Command {
     /// Chat with the AI.
     #[command(alias = "c")]
     Chat {
-        /// Text to prepend to the message as context.
-        context: Vec<String>,
-
         /// Model to use for the chat.
         #[arg(long, value_enum, default_value_t = Default::default())]
         model: Model,
@@ -298,11 +295,10 @@ async fn main() -> eyre::Result<()> {
 
     match cli.command {
         Command::Chat {
-            context,
             model,
             temperature,
             api_key,
-        } => handle_chat(&context, model, temperature, &api_key, path).await?,
+        } => handle_chat(model, temperature, &api_key, path).await?,
         Command::Show => handle_show(path)?,
     }
 
@@ -362,21 +358,12 @@ fn handle_show(path: impl AsRef<Path>) -> eyre::Result<()> {
 
 #[inline]
 async fn handle_chat(
-    context: &[String],
     model: Model,
     temperature: f32,
     api_key: impl Into<String>,
     path: impl AsRef<Path>,
 ) -> eyre::Result<()> {
     let message = read_message_from_stdin()?;
-
-    let context = context.join(" ");
-    let message = match (context.is_empty(), message.is_empty()) {
-        (false, false) => [context, message].join(" "),
-        (false, true) => context,
-        (true, false) => message,
-        (true, true) => eyre::bail!("cannot use empty string as chat message"),
-    };
     eyre::ensure!(
         !message.trim().is_empty(),
         "cannot use all-whitespace string as chat message"
