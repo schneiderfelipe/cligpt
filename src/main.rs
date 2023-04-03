@@ -332,6 +332,7 @@ async fn process_chat_response(stream: &mut ChatCompletionResponseStream) -> eyr
                 write!(stdout, "{text}")
                     .context("failed to write response delta to the standard output")?;
                 write!(buffer, "{text}").context("failed to write response delta to buffer")?;
+                stdout.flush()?
             }
         }
     }
@@ -353,6 +354,7 @@ fn handle_show(path: impl AsRef<Path>) -> eyre::Result<()> {
         }
         writeln!(stdout, "{}", message.content)?;
         writeln!(stdout)?;
+        stdout.flush()?;
     }
 
     Ok(())
