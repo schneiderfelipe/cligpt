@@ -148,8 +148,8 @@ use std::io::Write;
 use std::ops::RangeInclusive;
 use std::path::Path;
 
-use async_openai::types::ChatCompletionRequestMessage as Message;
-use async_openai::types::ChatCompletionRequestMessageArgs as MessageArgs;
+use async_openai::types::ChatCompletionRequestMessage;
+use async_openai::types::ChatCompletionRequestMessageArgs;
 use async_openai::types::ChatCompletionResponseStream;
 use async_openai::types::CreateChatCompletionRequestArgs;
 use async_openai::types::CreateEmbeddingRequestArgs;
@@ -161,6 +161,15 @@ use clap::ValueEnum;
 use color_eyre::eyre;
 use color_eyre::eyre::Context;
 use futures_util::StreamExt;
+
+const API_KEY_RANGE: RangeInclusive<usize> = 40..=50;
+const TEMPERATURE_RANGE: RangeInclusive<f32> = 0.0..=1.0;
+
+const EMBEDDING_LENGTH: usize = 1536;
+const PATH: &str = "cligpt.chat.json"; // TODO: use a user directory to store
+
+type Embedding = Vec<f32>;
+type EmbeddedMessage = (ChatCompletionRequestMessage, Embedding);
 
 /// A command-line interface to talk to `ChatGPT`.
 #[derive(Debug, Parser)]
@@ -219,8 +228,6 @@ impl Model {
     }
 }
 
-const TEMPERATURE_RANGE: RangeInclusive<f32> = 0.0..=1.0;
-
 #[inline]
 fn temperature_parser(temperature: &str) -> eyre::Result<f32> {
     let temperature: f32 = temperature.parse()?;
@@ -237,8 +244,6 @@ fn temperature_parser(temperature: &str) -> eyre::Result<f32> {
 
     Ok(temperature)
 }
-
-const API_KEY_RANGE: RangeInclusive<usize> = 40..=50;
 
 // Logic from <https://docs.gitguardian.com/secrets-detection/detectors/specifics/openai_apikey>.
 #[inline]
@@ -290,9 +295,9 @@ async fn main() -> eyre::Result<()> {
             api_key,
         } => handle_chat(context, model, temperature, api_key).await?,
         Command::Show => {
-            let embedded_messages = read_chat_from_path()?;
+            let chat = read_chat_from_path()?;
 
-            for (message, _) in embedded_messages {
+            for (message, _) in chat {
                 if let Some(name) = message.name {
                     eprintln!("{name}:");
                 } else {
@@ -359,14 +364,14 @@ async fn handle_chat(
         "cannot use all-whitespace string as chat message"
     );
 
-    let mut embedded_messages = read_chat_from_path()?;
+    let mut chat = read_chat_from_path()?;
 
     let client = Client::new().with_api_key(api_key);
 
     let message = strip_trailing_newline(&message);
     let message_embedding = embed(&client, message).await?;
-    embedded_messages.push((
-        MessageArgs::default()
+    chat.push((
+        ChatCompletionRequestMessageArgs::default()
             .content(message)
             .build()
             .context("failed to build chat message")?,
@@ -377,8 +382,7 @@ async fn handle_chat(
         .model(model.name())
         .temperature(temperature)
         .messages(
-            embedded_messages
-                .iter()
+            chat.iter()
                 .cloned()
                 .map(|(message, _)| message)
                 .collect::<Vec<_>>(),
@@ -396,8 +400,8 @@ async fn handle_chat(
 
     let buffer = strip_trailing_newline(&buffer);
     let buffer_embedding = embed(&client, buffer).await?;
-    embedded_messages.push((
-        MessageArgs::default()
+    chat.push((
+        ChatCompletionRequestMessageArgs::default()
             .content(buffer)
             .role(Role::Assistant)
             .build()
@@ -405,47 +409,17 @@ async fn handle_chat(
         buffer_embedding,
     ));
 
-    let most_similar = {
-        let mut iter = embedded_messages.iter().enumerate().rev();
-        let last_response = iter.next().unwrap();
-        let last_request = iter.next().unwrap();
-        iter.map(|(n, (c, e))| {
-            (
-                n,
-                c,
-                cosine_similarity(e, &last_request.1 .1)
-                    .max(cosine_similarity(e, &last_response.1 .1)),
-            )
-        })
-        .max_by(|(_, _, x), (_, _, y)| x.partial_cmp(y).unwrap())
-    };
-    eprintln!("{most_similar:#?}");
-    let least_similar = {
-        let mut iter = embedded_messages.iter().enumerate().rev();
-        let last_response = iter.next().unwrap();
-        let last_request = iter.next().unwrap();
-        iter.map(|(n, (c, e))| {
-            (
-                n,
-                c,
-                cosine_similarity(e, &last_request.1 .1)
-                    .max(cosine_similarity(e, &last_response.1 .1)),
-            )
-        })
-        .min_by(|(_, _, x), (_, _, y)| x.partial_cmp(y).unwrap())
-    };
-    eprintln!("{least_similar:#?}");
+    let (current_chat, _outdated_chat) = split_chat(chat)?;
+    // TODO: summarize outdated and prepend to current
 
-    write_chat_to_path(&embedded_messages)?;
+    write_chat_to_path(&current_chat)?;
 
     Ok(())
 }
 
-const PATH: &str = "cligpt.chat.json";
-
 #[inline]
-fn read_chat_from_path() -> eyre::Result<Vec<(Message, Embedding)>> {
-    let embedded_messages = if Path::new(PATH).try_exists()? {
+fn read_chat_from_path() -> eyre::Result<Vec<EmbeddedMessage>> {
+    let chat = if Path::new(PATH).try_exists()? {
         eprintln!("Reading contents from {}", Path::new(PATH).display());
 
         let contents = fs::read_to_string(PATH)
@@ -461,15 +435,15 @@ fn read_chat_from_path() -> eyre::Result<Vec<(Message, Embedding)>> {
     } else {
         Vec::new()
     };
-    Ok(embedded_messages)
+    Ok(chat)
 }
 
 #[inline]
-fn write_chat_to_path(embedded_messages: &[(Message, Embedding)]) -> eyre::Result<()> {
+fn write_chat_to_path(chat: &[EmbeddedMessage]) -> eyre::Result<()> {
     eprintln!("\nWriting contents to {}", Path::new(PATH).display());
 
     let file = File::create(PATH)?;
-    serde_json::to_writer(file, embedded_messages).with_context(|| {
+    serde_json::to_writer(file, chat).with_context(|| {
         format!(
             "failed to serialize contents to {}",
             Path::new(PATH).display()
@@ -479,9 +453,66 @@ fn write_chat_to_path(embedded_messages: &[(Message, Embedding)]) -> eyre::Resul
     Ok(())
 }
 
-type Embedding = Vec<f32>;
+#[inline]
+fn split_chat(
+    mut chat: Vec<EmbeddedMessage>,
+) -> eyre::Result<(Vec<EmbeddedMessage>, Option<Vec<EmbeddedMessage>>)> {
+    if chat.len() < 4 {
+        return Ok((chat, None));
+    }
 
-const EMBEDDING_LENGTH: usize = 1536;
+    let (mut n_most_similar, mut n_least_similar) = {
+        let mut iter = chat.iter().enumerate().rev();
+        let last_response = iter.next().unwrap();
+        let last_request = iter.next().unwrap();
+
+        let most_similar = iter
+            .map(|(n, (_, embedding))| {
+                (
+                    n,
+                    cosine_similarity(embedding, &last_request.1 .1)
+                        .max(cosine_similarity(embedding, &last_response.1 .1)),
+                )
+            })
+            .max_by(|(_, x), (_, y)| x.partial_cmp(y).unwrap());
+
+        let mut iter = chat.iter().enumerate().rev();
+        let last_response = iter.next().unwrap();
+        let last_request = iter.next().unwrap();
+
+        let least_similar = iter
+            .map(|(n, (_, embedding))| {
+                (
+                    n,
+                    cosine_similarity(embedding, &last_request.1 .1)
+                        .max(cosine_similarity(embedding, &last_response.1 .1)),
+                )
+            })
+            .min_by(|(_, x), (_, y)| x.partial_cmp(y).unwrap());
+
+        let (most_similar, least_similar) = (most_similar.unwrap(), least_similar.unwrap());
+        eyre::ensure!(
+            most_similar.1 >= least_similar.1,
+            "most similar is less similar than least similar"
+        );
+        (most_similar.0, least_similar.0)
+    };
+
+    if chat[n_most_similar].0.role == Role::Assistant {
+        n_most_similar -= 1;
+    }
+    if chat[n_least_similar].0.role == Role::Assistant {
+        n_least_similar -= 1;
+    }
+    if n_most_similar <= n_least_similar {
+        return Ok((chat, None));
+    }
+
+    let current_chat = chat.split_off(n_least_similar);
+    let outdated_chat = chat;
+
+    Ok((current_chat, Some(outdated_chat)))
+}
 
 #[inline]
 async fn embed(client: &Client, input: &str) -> eyre::Result<Embedding> {
