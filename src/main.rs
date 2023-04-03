@@ -84,7 +84,7 @@
 //! Here's an example usage:
 //!
 //! ```bash
-//! cligpt --api-key YOUR_API_KEY 'Hello, ChatGPT!'
+//! cligpt --api-key YOUR_API_KEY chat 'Hello, ChatGPT!'
 //! ```
 //!
 //! This will send the message `'Hello, ChatGPT!'` to the `ChatGPT` API using
@@ -98,7 +98,7 @@
 //! you can set the temperature to 0.9 and use GPT-4:
 //!
 //! ```bash
-//! cligpt --temperature 0.9 --model gpt4 'Hello, ChatGPT!'
+//! cligpt --temperature 0.9 --model gpt4 chat 'Hello, ChatGPT!'
 //! ```
 //!
 //! In the example above,
@@ -166,48 +166,51 @@ use futures_util::StreamExt;
 #[derive(Debug, Parser)]
 #[command(version, author, about)]
 struct Cli {
+    /// Command to perform.
     #[command(subcommand)]
-    command: Option<Command>,
-
-    /// Text to prepend to the message as context.
-    context: Vec<String>,
-
-    /// Model to use for the chat.
-    #[arg(long, value_enum, default_value_t = Default::default())]
-    model: Model,
-
-    /// Temperature to use for the chat.
-    #[arg(long, default_value_t = 0.7, value_parser = temperature_parser)]
-    temperature: f32,
-
-    /// Your OpenAI API key.
-    #[arg(short = 'k', long, value_parser = api_key_parser, env = "OPENAI_API_KEY")]
-    api_key: String,
+    command: Command,
 }
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Chat with the AI.
+    Chat {
+        /// Text to prepend to the message as context.
+        context: Vec<String>,
+
+        /// Model to use for the chat.
+        #[arg(long, value_enum, default_value_t = Default::default())]
+        model: Model,
+
+        /// Temperature to use for the chat.
+        #[arg(long, default_value_t = 0.7, value_parser = temperature_parser)]
+        temperature: f32,
+
+        /// Your OpenAI API key.
+        #[arg(short = 'k', long, value_parser = api_key_parser, env = "OPENAI_API_KEY")]
+        api_key: String,
+    },
     /// List all chats.
-    ListChats,
+    List,
     /// Create a new chat.
-    NewChat,
+    New,
     /// Show a chat.
-    ShowChat {
+    Show {
         /// Name or ID of the chat to show.
         chat_name: String,
     },
     /// Switch to a different chat.
-    SwitchChat {
+    Switch {
         /// Name or ID of the chat to switch to.
         chat_name: String,
     },
     /// Delete a chat.
-    DeleteChat {
+    Delete {
         /// Name or ID of the chat to delete.
         chat_name: String,
     },
     /// Rename a chat.
-    RenameChat {
+    Rename {
         /// Name or ID of the chat to rename.
         chat_name: String,
         /// New name of the chat.
@@ -301,20 +304,34 @@ async fn main() -> eyre::Result<()> {
     color_eyre::install().context("failed to install error report handler")?;
 
     let cli = Cli::parse();
-    if let Some(command) = cli.command {
-        match command {
-            Command::ListChats => todo!(),
-            Command::NewChat => todo!(),
-            Command::ShowChat { chat_name: _ } => todo!(),
-            Command::SwitchChat { chat_name: _ } => todo!(),
-            Command::DeleteChat { chat_name: _ } => todo!(),
-            Command::RenameChat {
-                chat_name: _,
-                new_name: _,
-            } => todo!(),
+    match cli.command {
+        Command::Chat {
+            context,
+            model,
+            temperature,
+            api_key,
+        } => handle_chat(context, model, temperature, api_key).await?,
+        Command::List => todo!(),
+        Command::New => todo!(),
+        Command::Show { chat_name: _ } => {
+            let embedded_messages = read_chat_from_path()?;
+
+            for (message, _) in embedded_messages {
+                if let Some(name) = message.name {
+                    eprintln!("{name}:");
+                } else {
+                    eprintln!("{name}:", name = message.role);
+                }
+                eprintln!("{}", message.content);
+                eprintln!();
+            }
         }
-    } else {
-        handle_chat(cli).await?;
+        Command::Switch { chat_name: _ } => todo!(),
+        Command::Delete { chat_name: _ } => todo!(),
+        Command::Rename {
+            chat_name: _,
+            new_name: _,
+        } => todo!(),
     }
 
     Ok(())
@@ -352,10 +369,15 @@ async fn process_chat_response(stream: &mut ChatCompletionResponseStream) -> eyr
 }
 
 #[inline]
-async fn handle_chat(cli: Cli) -> eyre::Result<()> {
+async fn handle_chat(
+    context: Vec<String>,
+    model: Model,
+    temperature: f32,
+    api_key: String,
+) -> eyre::Result<()> {
     let message = read_message_from_stdin()?;
 
-    let context = cli.context.join(" ");
+    let context = context.join(" ");
     let message = match (context.is_empty(), message.is_empty()) {
         (false, false) => [context, message].join(" "),
         (false, true) => context,
@@ -369,7 +391,6 @@ async fn handle_chat(cli: Cli) -> eyre::Result<()> {
 
     let mut embedded_messages = read_chat_from_path()?;
 
-    let api_key = cli.api_key;
     let client = Client::new().with_api_key(api_key);
 
     let message = strip_trailing_newline(&message);
@@ -381,9 +402,6 @@ async fn handle_chat(cli: Cli) -> eyre::Result<()> {
             .context("failed to build chat message")?,
         message_embedding,
     ));
-
-    let model = cli.model;
-    let temperature = cli.temperature;
 
     let request = CreateChatCompletionRequestArgs::default()
         .model(model.name())
