@@ -174,28 +174,25 @@ type EmbeddedMessage = (ChatCompletionRequestMessage, Embedding);
 #[derive(Debug, Parser)]
 #[command(version, author, about)]
 struct Cli {
-    /// Command to perform.
+    /// Command to perform if not chatting with the AI.
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
+
+    /// Model to use for the chat.
+    #[arg(long, value_enum, default_value_t = Default::default())]
+    model: Model,
+
+    /// Temperature to use for the chat.
+    #[arg(long, default_value_t = 0.7, value_parser = temperature_parser)]
+    temperature: f32,
+
+    /// Your OpenAI API key.
+    #[arg(short = 'k', long, value_parser = api_key_parser, env = "OPENAI_API_KEY")]
+    api_key: String,
 }
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Chat with the AI.
-    #[command(alias = "c")]
-    Chat {
-        /// Model to use for the chat.
-        #[arg(long, value_enum, default_value_t = Default::default())]
-        model: Model,
-
-        /// Temperature to use for the chat.
-        #[arg(long, default_value_t = 0.7, value_parser = temperature_parser)]
-        temperature: f32,
-
-        /// Your OpenAI API key.
-        #[arg(short = 'k', long, value_parser = api_key_parser, env = "OPENAI_API_KEY")]
-        api_key: String,
-    },
     /// Show a chat.
     #[command(alias = "s")]
     Show,
@@ -293,13 +290,12 @@ async fn main() -> eyre::Result<()> {
         cache_dir.join("chat.json")
     };
 
-    match cli.command {
-        Command::Chat {
-            model,
-            temperature,
-            api_key,
-        } => handle_chat(model, temperature, &api_key, path).await?,
-        Command::Show => handle_show(path)?,
+    if let Some(command) = cli.command {
+        match command {
+            Command::Show => handle_show(path)?,
+        }
+    } else {
+        handle_chat(cli.model, cli.temperature, cli.api_key, path).await?;
     }
 
     Ok(())
