@@ -174,6 +174,7 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Chat with the AI.
+    #[command(alias = "c")]
     Chat {
         /// Text to prepend to the message as context.
         context: Vec<String>,
@@ -190,32 +191,9 @@ enum Command {
         #[arg(short = 'k', long, value_parser = api_key_parser, env = "OPENAI_API_KEY")]
         api_key: String,
     },
-    /// List all chats.
-    List,
-    /// Create a new chat.
-    New,
     /// Show a chat.
-    Show {
-        /// Name or ID of the chat to show.
-        chat_name: String,
-    },
-    /// Switch to a different chat.
-    Switch {
-        /// Name or ID of the chat to switch to.
-        chat_name: String,
-    },
-    /// Delete a chat.
-    Delete {
-        /// Name or ID of the chat to delete.
-        chat_name: String,
-    },
-    /// Rename a chat.
-    Rename {
-        /// Name or ID of the chat to rename.
-        chat_name: String,
-        /// New name of the chat.
-        new_name: String,
-    },
+    #[command(alias = "s")]
+    Show,
 }
 
 /// Different language models that can be used for natural language processing
@@ -311,9 +289,7 @@ async fn main() -> eyre::Result<()> {
             temperature,
             api_key,
         } => handle_chat(context, model, temperature, api_key).await?,
-        Command::List => todo!(),
-        Command::New => todo!(),
-        Command::Show { chat_name: _ } => {
+        Command::Show => {
             let embedded_messages = read_chat_from_path()?;
 
             for (message, _) in embedded_messages {
@@ -326,12 +302,6 @@ async fn main() -> eyre::Result<()> {
                 eprintln!();
             }
         }
-        Command::Switch { chat_name: _ } => todo!(),
-        Command::Delete { chat_name: _ } => todo!(),
-        Command::Rename {
-            chat_name: _,
-            new_name: _,
-        } => todo!(),
     }
 
     Ok(())
