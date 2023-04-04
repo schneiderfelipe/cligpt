@@ -40,7 +40,7 @@ default = [
   "rustls",
 ]
 color = ["clap/color"]
-error-context = ["clap/error-context"]
+error-context = ["clap/error-context", "color-eyre/track-caller"]
 help = ["clap/help"]
 suggestions = ["clap/suggestions"]
 usage = ["clap/usage"]
