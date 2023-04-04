@@ -18,11 +18,13 @@ and
 [`async-openai`](https://github.com/64bit/async-openai) crates
 to provide a user-friendly interface for the `ChatGPT` API.
 
-**Keep reading in order to learn how to [install](#installation) and [use](#usage) `cligpt`.**
+**Keep reading in order to learn how to [install](#installation) and
+[use](#usage) `cligpt`.**
 
 ## Available models
 
-- `--model=gpt35` ([ChatGPT](https://openai.com/blog/introducing-chatgpt-and-whisper-apis), [`gpt-3.5-turbo`](https://platform.openai.com/docs/guides/chat), default)
+- `--model=gpt35` ([ChatGPT](https://openai.com/blog/introducing-chatgpt-and-whisper-apis),
+  [`gpt-3.5-turbo`](https://platform.openai.com/docs/guides/chat), default)
 - `--model=gpt4` ([GPT-4](https://openai.com/product/gpt-4), [`gpt-4`](https://platform.openai.com/docs/guides/chat))
 
 ## Common use cases
@@ -129,7 +131,10 @@ $ echo "Repeat this message exactly how you read it" | cligpt
 Repeat this message exactly how you read it.
 ```
 
-`cligpt` also stores a single chat session, which can be viewed using `cligpt show`. For example:
+`cligpt` also stores a single chat session,
+which can be viewed using
+`cligpt show`.
+For example:
 
 ```console
 $ echo 'What is the capital of France?' | cligpt
@@ -163,7 +168,12 @@ assistant:
 As of 2021, the population of Paris is estimated to be around 2.2 million people. However, the population of the greater Paris metropolitan area, which includes surrounding suburbs and municipalities, is estimated to be around 12 million people.
 ```
 
-Chat context is managed by truncating the chat in some situations where we're confident we're only deleting irrelevant information. This is a conservative approach, so it might sometimes fail. If you notice issues with the chat context, please [file an issue](https://github.com/schneiderfelipe/cligpt/issues/new) so we can address it.
+Chat context is managed by truncating the chat in some situations where
+we're confident we're only deleting irrelevant information.
+This is a conservative approach,
+so it might sometimes fail.
+If you notice issues with the chat context,
+please [file an issue](https://github.com/schneiderfelipe/cligpt/issues/new) so we can address it.
 
 For more information on available options,
 run `cligpt --help`.
