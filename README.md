@@ -25,11 +25,11 @@ to provide a user-friendly interface for the `ChatGPT` API.
 
 ## Common use cases
 
-- Create personalized and unique text with ease (e.g., for your marketing campaigns or email newsletters).
-- Power your chatbot or virtual assistant with the latest text generation technology.
-- Automate the creation of quality text-based content in minutes (e.g., for your websites or social media platforms).
-- Prototype text generation applications quickly and efficiently with a user-friendly interface.
-- Experiment with the power of the ChatGPT API from the comfort of your terminal and experience the limitless possibilities of text generation.
+- Generate creative writing prompts or ideas.
+- Answer questions about specific topics or subjects.
+- Draft emails or other pieces of professional writing.
+- Summarize long pieces of text.
+- Translate text between different languages.
 
 ## Installation
 
@@ -128,24 +128,6 @@ Hello world! Repeat this message exactly how you read it.
 
 For more information on available options,
 run `cligpt --help`.
-
-## Design decisions
-
-The primary goal of `cligpt` is to provide a user-friendly experience.
-For this reason,
-it is designed to generate only a single response,
-whose maximum length is determined by the
-[`OpenAI` API endpoint](https://platform.openai.com/docs/api-reference/chat/create#chat/create-max_tokens).
-
-As a command-line application,
-`cligpt` allows for the use of
-[pipes and redirections](https://askubuntu.com/q/172982/361183)
-to load and save prompts and generated text,
-making such features of limited use in `cligpt`.
-
-Lastly,
-`cligpt` only supports the
-[chat completion endpoint](https://platform.openai.com/docs/api-reference/chat/create#chat/create-model).
 
 ## Contributing
 
