@@ -1,3 +1,5 @@
+//! [![dependency status](https://deps.rs/repo/github/schneiderfelipe/cligpt/status.svg)](https://deps.rs/repo/github/schneiderfelipe/cligpt)
+//!
 //! `cligpt` is a command-line interface for interacting
 //! with the `ChatGPT` API from `OpenAI`.
 //! With `cligpt`,
@@ -105,6 +107,24 @@
 //! For more information on available options,
 //! run `cligpt --help`.
 //!
+//! # Design decisions
+//!
+//! The primary goal of `cligpt` is to provide a user-friendly experience.
+//! For this reason,
+//! it is designed to generate only a single response,
+//! whose maximum length is determined by the
+//! [`OpenAI` API endpoint](https://platform.openai.com/docs/api-reference/chat/create#chat/create-max_tokens).
+//!
+//! As a command-line application,
+//! `cligpt` allows for the use of
+//! [pipes and redirections](https://askubuntu.com/q/172982/361183)
+//! to load and save prompts and generated text,
+//! making such features of limited use in `cligpt`.
+//!
+//! Lastly,
+//! `cligpt` only supports the
+//! [chat completion endpoint](https://platform.openai.com/docs/api-reference/chat/create#chat/create-model).
+//!
 //! # Contributing
 //!
 //! Contributions to `cligpt` are welcome!
@@ -119,25 +139,44 @@
 //!
 //! `cligpt` is released under the [MIT License](LICENSE).
 
-use std::{
-    io::{self, Read, Write},
-    ops::RangeInclusive,
-};
+use std::fmt::Write as _;
+use std::fs;
+use std::io;
+use std::io::Read;
+use std::io::Write;
+use std::ops::RangeInclusive;
+use std::path::Path;
 
-use async_openai::{
-    types::{ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs},
-    Client,
-};
-use clap::{Parser, ValueEnum};
-use color_eyre::eyre::{self, Context};
+use async_openai::types::ChatCompletionRequestMessage;
+use async_openai::types::ChatCompletionRequestMessageArgs;
+use async_openai::types::ChatCompletionResponseStream;
+use async_openai::types::CreateChatCompletionRequestArgs;
+use async_openai::types::CreateEmbeddingRequestArgs;
+use async_openai::types::Role;
+use async_openai::Client;
+use clap::Parser;
+use clap::Subcommand;
+use clap::ValueEnum;
+use color_eyre::eyre;
+use color_eyre::eyre::Context;
+use directories::ProjectDirs;
 use futures_util::StreamExt;
+
+const API_KEY_RANGE: RangeInclusive<usize> = 40..=50;
+const TEMPERATURE_RANGE: RangeInclusive<f32> = 0.0..=1.0;
+
+const EMBEDDING_LENGTH: usize = 1536;
+
+type Embedding = Vec<f32>;
+type EmbeddedMessage = (ChatCompletionRequestMessage, Embedding);
 
 /// A command-line interface to talk to `ChatGPT`.
 #[derive(Debug, Parser)]
 #[command(version, author, about)]
 struct Cli {
-    /// Text to prepend to the message as context.
-    context: Vec<String>,
+    /// Command to perform if not chatting with the AI.
+    #[command(subcommand)]
+    command: Option<Command>,
 
     /// Model to use for the chat.
     #[arg(long, value_enum, default_value_t = Default::default())]
@@ -152,7 +191,15 @@ struct Cli {
     api_key: String,
 }
 
-/// Different language models that can be used for natural language processing tasks.
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Show a chat.
+    #[command(alias = "s")]
+    Show,
+}
+
+/// Different language models that can be used for natural language processing
+/// tasks.
 #[derive(Clone, Copy, Debug, Default, ValueEnum)]
 enum Model {
     /// A highly capable GPT-3.5 model optimized for chat at a reduced cost.
@@ -166,15 +213,13 @@ enum Model {
 
 impl Model {
     #[inline]
-    fn name(self) -> &'static str {
+    const fn name(self) -> &'static str {
         match self {
-            Model::Gpt35 => "gpt-3.5-turbo",
-            Model::Gpt4 => "gpt-4",
+            Self::Gpt35 => "gpt-3.5-turbo",
+            Self::Gpt4 => "gpt-4",
         }
     }
 }
-
-const TEMPERATURE_RANGE: RangeInclusive<f32> = 0.0..=1.0;
 
 #[inline]
 fn temperature_parser(temperature: &str) -> eyre::Result<f32> {
@@ -192,8 +237,6 @@ fn temperature_parser(temperature: &str) -> eyre::Result<f32> {
 
     Ok(temperature)
 }
-
-const API_KEY_RANGE: RangeInclusive<usize> = 40..=50;
 
 // Logic from <https://docs.gitguardian.com/secrets-detection/detectors/specifics/openai_apikey>.
 #[inline]
@@ -238,72 +281,317 @@ async fn main() -> eyre::Result<()> {
 
     let cli = Cli::parse();
 
-    let message = {
-        let mut message = String::new();
-        io::stdin()
-            .lock()
-            .read_to_string(&mut message)
-            .context("failed to read from the standard input")?;
-        message
+    let path = {
+        let Some(proj_dirs) = ProjectDirs::from("com", "schneiderfelipe", "cligpt") else {
+            eyre::bail!("failed to obtain project directory");
+        };
+        let cache_dir = proj_dirs.cache_dir();
+        fs::create_dir_all(cache_dir).context("failed to create the cache directory")?;
+        cache_dir.join("chat.json")
     };
 
-    let context = cli.context.join(" ");
-    let message = match (context.is_empty(), message.is_empty()) {
-        (false, false) => [context, message].join(" "),
-        (false, true) => context,
-        (true, false) => message,
-        (true, true) => eyre::bail!("cannot use empty string as chat message"),
-    };
+    if let Some(command) = cli.command {
+        match command {
+            Command::Show => handle_show(path).context("failed to handle the show command")?,
+        }
+    } else {
+        handle_chat(cli.model, cli.temperature, cli.api_key, path)
+            .await
+            .context("failed to handle the chat command")?;
+    }
+
+    Ok(())
+}
+
+#[inline]
+fn read_message_from_stdin() -> eyre::Result<String> {
+    let mut message = String::new();
+    io::stdin()
+        .lock()
+        .read_to_string(&mut message)
+        .context("failed to read from the standard input")?;
+    Ok(message)
+}
+
+#[inline]
+async fn process_chat_response(stream: &mut ChatCompletionResponseStream) -> eyre::Result<String> {
+    let mut stdout = io::stdout().lock();
+    let mut buffer = String::new();
+
+    writeln!(stdout).context("failed to write new line to the standard output")?;
+    while let Some(result) = stream.next().await {
+        let response = result.context("failed to obtain a stream response")?;
+        if let Some(choice) = response.choices.get(0) {
+            if let Some(text) = &choice.delta.content {
+                write!(stdout, "{text}")
+                    .context("failed to write response delta to the standard output")?;
+                write!(buffer, "{text}").context("failed to write response delta to buffer")?;
+                stdout
+                    .flush()
+                    .context("failed to flush the standard output")?
+            }
+        }
+    }
+    writeln!(stdout).context("failed to write new line to the standard output")?;
+    writeln!(buffer).context("failed to write new line to buffer")?;
+    Ok(buffer)
+}
+
+#[inline]
+fn handle_show(path: impl AsRef<Path>) -> eyre::Result<()> {
+    let chat = read_chat_from_path(path).context("failed to read the chat history")?;
+
+    let mut stdout = io::stdout().lock();
+    for (message, _) in chat {
+        if let Some(name) = message.name {
+            writeln!(stdout, "{name}:").context("failed to write name to the standard output")?;
+        } else {
+            writeln!(stdout, "{name}:", name = message.role)
+                .context("failed to write role to the standard output")?;
+        }
+        writeln!(stdout, "{}", message.content)
+            .context("failed to write content to the standard output")?;
+        writeln!(stdout).context("failed to write a new line to the standard output")?;
+        stdout
+            .flush()
+            .context("failed to flush the standard output")?;
+    }
+
+    Ok(())
+}
+
+#[inline]
+async fn handle_chat(
+    model: Model,
+    temperature: f32,
+    api_key: impl Into<String>,
+    path: impl AsRef<Path>,
+) -> eyre::Result<()> {
+    let message =
+        read_message_from_stdin().context("failed to read message from the standard input")?;
     eyre::ensure!(
         !message.trim().is_empty(),
         "cannot use all-whitespace string as chat message"
     );
 
-    let api_key = cli.api_key;
-    let model = cli.model;
-    let temperature = cli.temperature;
+    let mut chat = read_chat_from_path(&path).context("failed to read chat history")?;
 
     let client = Client::new().with_api_key(api_key);
+
+    let message = strip_trailing_newline(&message);
+    let message_embedding = embed(&client, message)
+        .await
+        .context("failed to embed message")?;
+    chat.push((
+        ChatCompletionRequestMessageArgs::default()
+            .content(message)
+            .build()
+            .context("failed to build chat message")?,
+        message_embedding,
+    ));
+
     let request = CreateChatCompletionRequestArgs::default()
         .model(model.name())
         .temperature(temperature)
-        .messages([ChatCompletionRequestMessageArgs::default()
-            .content(message)
-            .build()
-            .context("failed to build chat message")?])
+        .messages(
+            chat.iter()
+                .cloned()
+                .map(|(message, _)| message)
+                .collect::<Vec<_>>(),
+        )
         .build()
         .context("failed to build the completion request")?;
+
     let mut stream = client
         .chat()
         .create_stream(request)
         .await
         .context("failed to create the completion stream")?;
 
-    {
-        let mut stdout = io::stdout().lock();
-        while let Some(result) = stream.next().await {
-            let response = result.context("failed to obtain a stream response")?;
-            if let Some(choice) = response.choices.get(0) {
-                if let Some(text) = &choice.delta.content {
-                    write!(stdout, "{text}")
-                        .context("failed to write response delta to the standard output")?;
-                }
-            }
-        }
-        writeln!(stdout).context("failed to write new line to the standard output")?;
-    }
+    let buffer = process_chat_response(&mut stream)
+        .await
+        .context("failed to process chat response")?;
+
+    let buffer = strip_trailing_newline(&buffer);
+    let buffer_embedding = embed(&client, buffer)
+        .await
+        .context("failed to embed response")?;
+    chat.push((
+        ChatCompletionRequestMessageArgs::default()
+            .content(buffer)
+            .role(Role::Assistant)
+            .build()
+            .context("failed to build chat message")?,
+        buffer_embedding,
+    ));
+
+    let (current_chat, _outdated_chat) = split_chat(chat).context("failed to split chat")?;
+
+    write_chat_to_path(&current_chat, path).context("failed to save chat history")?;
 
     Ok(())
 }
 
+#[inline]
+fn read_chat_from_path(path: impl AsRef<Path>) -> eyre::Result<Vec<EmbeddedMessage>> {
+    let path = path.as_ref();
+
+    let chat = if path
+        .try_exists()
+        .context("failed to check if chat history file exists")?
+    {
+        let contents = fs::read_to_string(path)
+            .with_context(|| format!("failed to read from {}", path.display()))?;
+
+        // https://github.com/serde-rs/json/issues/160#issuecomment-253446892
+        serde_json::from_str(&contents)
+            .with_context(|| format!("failed to deserialize contents of {}", path.display()))?
+    } else {
+        Vec::new()
+    };
+    Ok(chat)
+}
+
+#[inline]
+fn write_chat_to_path(chat: &[EmbeddedMessage], path: impl AsRef<Path>) -> eyre::Result<()> {
+    let path = path.as_ref();
+
+    let file = fs::File::create(path).context("failed to create chat history file")?;
+    serde_json::to_writer(file, chat)
+        .with_context(|| format!("failed to serialize contents to {}", path.display()))?;
+
+    Ok(())
+}
+
+#[inline]
+fn split_chat(
+    mut chat: Vec<EmbeddedMessage>,
+) -> eyre::Result<(Vec<EmbeddedMessage>, Option<Vec<EmbeddedMessage>>)> {
+    if chat.len() < 4 {
+        return Ok((chat, None));
+    }
+
+    let (mut n_most_similar, mut n_least_similar) = {
+        let mut iter = chat.iter().enumerate().rev();
+        let last_response = iter.next().unwrap();
+        let last_request = iter.next().unwrap();
+
+        let most_similar = iter
+            .map(|(n, (_, embedding))| {
+                (
+                    n,
+                    cosine_similarity(embedding, &last_request.1 .1)
+                        .max(cosine_similarity(embedding, &last_response.1 .1)),
+                )
+            })
+            .max_by(|(_, x), (_, y)| x.partial_cmp(y).unwrap());
+
+        let mut iter = chat.iter().enumerate().rev();
+        let last_response = iter.next().unwrap();
+        let last_request = iter.next().unwrap();
+
+        let least_similar = iter
+            .map(|(n, (_, embedding))| {
+                (
+                    n,
+                    cosine_similarity(embedding, &last_request.1 .1)
+                        .max(cosine_similarity(embedding, &last_response.1 .1)),
+                )
+            })
+            .min_by(|(_, x), (_, y)| x.partial_cmp(y).unwrap());
+
+        let (most_similar, least_similar) = (most_similar.unwrap(), least_similar.unwrap());
+        eyre::ensure!(
+            most_similar.1 >= least_similar.1,
+            "most similar is less similar than least similar"
+        );
+        (most_similar.0, least_similar.0)
+    };
+
+    if chat[n_most_similar].0.role == Role::Assistant {
+        n_most_similar -= 1;
+    }
+    if chat[n_least_similar].0.role == Role::Assistant {
+        n_least_similar -= 1;
+    }
+    if n_most_similar <= n_least_similar {
+        return Ok((chat, None));
+    }
+
+    let current_chat = chat.split_off(n_least_similar);
+    let outdated_chat = chat;
+
+    Ok((current_chat, Some(outdated_chat)))
+}
+
+#[inline]
+async fn embed(client: &Client, input: &str) -> eyre::Result<Embedding> {
+    let request = CreateEmbeddingRequestArgs::default()
+        .model("text-embedding-ada-002")
+        .input(input)
+        .build()
+        .context("failed to create embedding request")?;
+    let response = client
+        .embeddings()
+        .create(request)
+        .await
+        .context("failed to obtain embedding response")?;
+    let data = response.data.into_iter().next();
+    let embedding = data
+        .map(|data| data.embedding)
+        .ok_or_else(|| eyre::eyre!("failed to embed '{input}'"))?;
+    eyre::ensure!(
+        embedding.len() == EMBEDDING_LENGTH,
+        "embedding has incorrect length (expected {EMBEDDING_LENGTH}, got {})",
+        embedding.len()
+    );
+    Ok(embedding)
+}
+
+// https://github.com/openai/openai-python/blob/47ce29542e7fc496c1cd0bb323293b7991f45bb0/openai/embeddings_utils.py#L67-L68
+#[inline]
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+    #[inline]
+    fn dot(a: &[f32], b: &[f32]) -> f32 {
+        a.iter().zip(b).map(|(a, b)| a * b).sum()
+    }
+    dot(a, b) / (dot(a, a) * dot(b, b)).sqrt()
+}
+
+// https://stackoverflow.com/a/66401342/4039050
+#[inline]
+fn strip_trailing_newline(input: &str) -> &str {
+    input
+        .strip_suffix("\r\n")
+        .or_else(|| input.strip_suffix('\n'))
+        .unwrap_or(input)
+}
+
 #[cfg(test)]
 mod tests {
-    use clap::CommandFactory;
-
     use super::*;
 
     #[test]
     fn verify_cli() {
+        use clap::CommandFactory;
+
         Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn strip_newline_works() {
+        assert_eq!(strip_trailing_newline("Test0\r\n\r\n"), "Test0\r\n");
+        assert_eq!(strip_trailing_newline("Test1\r\n"), "Test1");
+        assert_eq!(strip_trailing_newline("Test2\n"), "Test2");
+        assert_eq!(strip_trailing_newline("Test3"), "Test3");
+    }
+
+    #[test]
+    fn cosine_similarity_works() {
+        use approx::assert_abs_diff_eq;
+
+        assert_abs_diff_eq!(cosine_similarity(&[0.0, 1.0], &[0.0, 1.0]), 1.0);
+        assert_abs_diff_eq!(cosine_similarity(&[0.0, 1.0], &[1.0, 0.0]), 0.0);
+        assert_abs_diff_eq!(cosine_similarity(&[0.0, 1.0], &[0.5, 0.5]), 0.707_106_77);
     }
 }
