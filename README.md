@@ -5,7 +5,7 @@
 `cligpt` is a command-line interface for interacting
 with the `ChatGPT` API from `OpenAI`.
 With `cligpt`,
-you can quickly and easily generate text by sending prompts to `ChatGPT`
+you can quickly and easily generate text by sending messages to `ChatGPT`
 from your terminal.
 Simply provide your `OpenAI` API key and the message you want to generate,
 and `cligpt` will handle the rest.
@@ -25,10 +25,10 @@ to provide a user-friendly interface for the `ChatGPT` API.
 
 ## Common use cases
 
-- Generate creative writing prompts or ideas.
-- Answer questions about specific topics or subjects.
-- Draft emails or other pieces of professional writing.
-- Summarize long pieces of text.
+- Generate creative writing ideas or brainstorm topics.
+- Get assistance with answering questions about specific subjects.
+- Draft emails or other professional writing pieces.
+- Summarize lengthy texts.
 - Translate text between different languages.
 
 ## Installation
@@ -98,7 +98,7 @@ or by setting the `OPENAI_API_KEY` environment variable.
 Here's an example usage:
 
 ```bash
-cligpt --api-key YOUR_API_KEY 'Hello, ChatGPT!'
+echo 'Hello, ChatGPT!' | cligpt --api-key YOUR_API_KEY
 ```
 
 This will send the message `'Hello, ChatGPT!'` to the `ChatGPT` API using
@@ -112,19 +112,42 @@ For example,
 you can set the temperature to 0.9 and use GPT-4:
 
 ```bash
-cligpt --temperature 0.9 --model gpt4 'Hello, ChatGPT!'
+echo 'Hello, ChatGPT!' | cligpt --temperature 0.9 --model gpt4
 ```
 
 In the example above,
 the API key will be read from the environment.
 
-`cligpt` supports receiving prompt both from the standard input and as positional arguments.
-Each prompt piece is concatenated and separated by a single space, with the standard input coming last:
+`cligpt` supports receiving input only from the standard input:
 
 ```console
-$ echo "Repeat this message exactly how you read it" | cligpt Hello 'world!'
-Hello world! Repeat this message exactly how you read it.
+$ echo "Repeat this message exactly how you read it" | cligpt
+Repeat this message exactly how you read it.
 ```
+
+`cligpt` also stores a single chat session, which can be viewed using `cligpt show`. For example:
+
+```console
+$ echo 'What is the capital of France?' | cligpt
+The capital of France is Paris.
+$ cligpt show
+User: What is the capital of France?
+ChatGPT: The capital of France is Paris.
+```
+
+You can continue a conversation using the stored chat session:
+
+```console
+$ echo 'What is the population of Paris?' | cligpt
+The population of Paris is approximately 2.2 million people.
+$ cligpt show
+User: What is the capital of France?
+ChatGPT: The capital of France is Paris.
+User: What is the population of Paris?
+ChatGPT: The population of Paris is approximately 2.2 million people.
+```
+
+Chat context is managed by truncating the chat in some situations where we're confident we're only deleting irrelevant information. This is a conservative approach, so it might sometimes fail. If you notice issues with the chat context, please [file an issue](https://github.com/schneiderfelipe/cligpt/issues/new) so we can address it.
 
 For more information on available options,
 run `cligpt --help`.
