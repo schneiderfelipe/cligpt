@@ -97,8 +97,9 @@ or by setting the `OPENAI_API_KEY` environment variable.
 
 Here's an example usage:
 
-```bash
-echo 'Hello, ChatGPT!' | cligpt --api-key YOUR_API_KEY
+```console
+$ echo 'Hello, ChatGPT!' | cligpt --api-key YOUR_API_KEY
+Hello there, how may I assist you today?
 ```
 
 This will send the message `'Hello, ChatGPT!'` to the `ChatGPT` API using
@@ -111,8 +112,9 @@ and the language model to use.
 For example,
 you can set the temperature to 0.9 and use GPT-4:
 
-```bash
-echo 'Hello, ChatGPT!' | cligpt --temperature 0.9 --model gpt4
+```console
+$ echo 'Hello, ChatGPT!' | cligpt --temperature 0.9 --model gpt4
+Hello! How can I help you today? If you have any questions or need assistance, feel free to ask.
 ```
 
 In the example above,
@@ -130,21 +132,33 @@ Repeat this message exactly how you read it.
 ```console
 $ echo 'What is the capital of France?' | cligpt
 The capital of France is Paris.
+
 $ cligpt show
-User: What is the capital of France?
-ChatGPT: The capital of France is Paris.
+user:
+What is the capital of France?
+
+assistant:
+The capital of France is Paris.
 ```
 
 You can continue a conversation using the stored chat session:
 
 ```console
-$ echo 'What is the population of Paris?' | cligpt
-The population of Paris is approximately 2.2 million people.
+$ echo "What is the city's population?" | cligpt
+As of 2021, the population of Paris is estimated to be around 2.2 million people. However, the population of the greater Paris metropolitan area, which includes surrounding suburbs and municipalities, is estimated to be around 12 million people.
+
 $ cligpt show
-User: What is the capital of France?
-ChatGPT: The capital of France is Paris.
-User: What is the population of Paris?
-ChatGPT: The population of Paris is approximately 2.2 million people.
+user:
+What is the capital of France?
+
+assistant:
+The capital of France is Paris.
+
+user:
+What is the city's population?
+
+assistant:
+As of 2021, the population of Paris is estimated to be around 2.2 million people. However, the population of the greater Paris metropolitan area, which includes surrounding suburbs and municipalities, is estimated to be around 12 million people.
 ```
 
 Chat context is managed by truncating the chat in some situations where we're confident we're only deleting irrelevant information. This is a conservative approach, so it might sometimes fail. If you notice issues with the chat context, please [file an issue](https://github.com/schneiderfelipe/cligpt/issues/new) so we can address it.
