@@ -21,7 +21,7 @@
 //!
 //! # Available models
 //!
-//! - `--model=gpt35` ([ChatGPT](https://openai.com/blog/introducing-chatgpt-and-whisper-apis),
+//! - `--model=gpt35` ([`ChatGPT`](https://openai.com/blog/introducing-chatgpt-and-whisper-apis),
 //!   [`gpt-3.5-turbo`](https://platform.openai.com/docs/guides/chat), default)
 //! - `--model=gpt4` ([GPT-4](https://openai.com/product/gpt-4), [`gpt-4`](https://platform.openai.com/docs/guides/chat))
 //!
